@@ -90,7 +90,7 @@
   </div>
 </div>
 
-<div class="glass rounded-2xl p-5 overflow-auto">
+<div id="mainDashboardContainer" class="glass rounded-2xl p-5 overflow-auto">
   <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
     <h2 class="text-xl font-semibold">Staff Certification Records</h2>
 
@@ -132,11 +132,105 @@
 
 <script>
 
+/*
+====================================================
+DEPARTMENT PARSER BACKEND NOTES
+====================================================
+
+RULE:
+1 Department = 1 Dedicated Parser
+
+Each department MUST have:
+- own row mapping
+- own column mapping
+- own filtering logic
+- own isolated parser block
+
+----------------------------------------------------
+ANAESTHESIA
+----------------------------------------------------
+Sheet:
+DATABASE RESUSITASI JABATAN
+
+Row Mapping:
+Data starts row 7
+
+Column Mapping:
+Name = Column C
+Designation = Column E
+Expiry Year = Column I
+
+Filtering:
+- remove PEGAWAI rows
+- remove TOTAL rows
+- remove BLS VALID rows
+
+----------------------------------------------------
+NEPHROLOGY
+----------------------------------------------------
+Sheet:
+DATABASE RESUSITASI JABATAN
+
+Row Mapping:
+Data starts row 7
+
+Column Mapping:
+Name = Column C
+Designation = Column E
+Expiry Year = Column I
+
+Filtering:
+- designation cannot be empty
+- remove DIKEMASKINI OLEH
+- remove NEPHROLOGIST
+- remove PEGAWAI rows
+
+----------------------------------------------------
+CARDIOLOGY
+----------------------------------------------------
+Sheet:
+PAKAR ,MO
+
+Row Mapping:
+Data starts row 7
+
+Column Mapping:
+Name = Column C
+Designation = Column F
+Expiry Year = Column J
+
+Filtering:
+- designation cannot be empty
+- remove PEGAWAI rows
+
+====================================================
+ADDING FUTURE DEPARTMENTS
+====================================================
+
+1. Add new SHEET_CONFIGS entry
+2. Create dedicated parser block:
+
+if (config.department === "NEW_DEPARTMENT") {
+   ...
+}
+
+3. NEVER modify existing department parser
+4. Keep all department parsers isolated
+
+====================================================
+*/
+
 const SHEET_CONFIGS = [
   {
     sheetId: "1P3cJ_v4nOETcYKlVgZMnAFEs-PKnnWyhHBJ__nThj48",
     tabName: "DATABASE RESUSITASI JABATAN",
     department: "Nephrology",
+    expiryHeader: "EXPIRY DATE BLS"
+  },
+  {
+    sheetId: "1oP9SiAHGuJpcWaSB5NjlzY56K3D4nCNZ4hdMl_kLwLw",
+    tabName: "PAKAR ,MO",
+    department: "Cardiology",
     expiryHeader: "EXPIRY DATE BLS"
   },
   {
@@ -248,6 +342,58 @@ async function fetchSheet(config) {
       }
 
       return nephrologyData;
+    }
+
+    // Cardiology parser
+    if (config.department === "Cardiology") {
+
+      const cardiologyData = [];
+
+      // Row 7 onwards
+      for (let i = 6; i < rows.length; i++) {
+
+        const row = rows[i].c || [];
+
+        // Column C = Name
+        const staffName = row[2]?.f || row[2]?.v || "";
+
+        if (!staffName) continue;
+
+        const cleanName = String(staffName)
+          .trim()
+          .replace(/\s+/g, ' ');
+
+        const upperName = cleanName.toUpperCase();
+
+        // Column F = Designation
+        const designation =
+          row[5]?.f ||
+          row[5]?.v ||
+          "";
+
+        if (
+          !cleanName ||
+          !String(designation).trim() ||
+          invalidRows.includes(upperName) ||
+          upperName.startsWith("PEGAWAI")
+        ) {
+          continue;
+        }
+
+        cardiologyData.push({
+          NAME: cleanName,
+          DEPARTMENT: "Cardiology",
+          DESIGNATION: designation,
+
+          // Column J = Expiry Year
+          "EXPIRY DATE BLS":
+            row[9]?.f ||
+            row[9]?.v ||
+            ""
+        });
+      }
+
+      return cardiologyData;
     }
 
     // Anaesthesia parser
@@ -569,6 +715,8 @@ function buildCharts(valid, expired, soon, deptMap) {
     }
   });
 }
+
+
 
 function populateTable() {
 
