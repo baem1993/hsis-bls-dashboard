@@ -120,6 +120,7 @@
         <th class="py-3 w-16">#</th>
         <th>Name</th>
         <th>Department</th>
+        <th>Designation</th>
         <th>Expiry Year</th>
         <th>Status</th>
       </tr>
@@ -132,6 +133,12 @@
 <script>
 
 const SHEET_CONFIGS = [
+  {
+    sheetId: "1P3cJ_v4nOETcYKlVgZMnAFEs-PKnnWyhHBJ__nThj48",
+    tabName: "DATABASE RESUSITASI JABATAN",
+    department: "Nephrology",
+    expiryHeader: "EXPIRY DATE BLS"
+  },
   {
     sheetId: "1aEk6QbghRafXg-arqt4jcTCk0pcvedmeszQjzxYpUSA",
     tabName: "DATABASE RESUSITASI JABATAN",
@@ -194,6 +201,55 @@ async function fetchSheet(config) {
       return [];
     }
 
+    // Nephrology parser
+    if (config.department === "Nephrology") {
+
+      const nephrologyData = [];
+
+      for (let i = 6; i < rows.length; i++) {
+
+        const row = rows[i].c || [];
+
+        const staffName = row[2]?.f || row[2]?.v || "";
+
+        if (!staffName) continue;
+
+        const cleanName = String(staffName)
+          .trim()
+          .replace(/\s+/g, ' ');
+
+        const upperName = cleanName.toUpperCase();
+
+        const designation =
+          row[4]?.f ||
+          row[4]?.v ||
+          "";
+
+        if (
+          !cleanName ||
+          !String(designation).trim() ||
+          invalidRows.includes(upperName) ||
+          upperName.startsWith("PEGAWAI") ||
+          upperName.includes("DIKEMASKINI OLEH") ||
+          upperName.includes("NEPHROLOGIST")
+        ) {
+          continue;
+        }
+
+        nephrologyData.push({
+          NAME: cleanName,
+          DEPARTMENT: "Nephrology",
+          DESIGNATION: designation,
+          "EXPIRY DATE BLS":
+            row[8]?.f ||
+            row[8]?.v ||
+            ""
+        });
+      }
+
+      return nephrologyData;
+    }
+
     // Anaesthesia parser
     let headerRowIndex = -1;
 
@@ -241,6 +297,13 @@ async function fetchSheet(config) {
       }
 
       obj["DEPARTMENT"] = config.department;
+
+      // Anaesthesia Designation = Column E
+      // Data starts row 7
+      obj["DESIGNATION"] =
+        row[4]?.f ||
+        row[4]?.v ||
+        "";
       // Use DATE BLS column values directly as Expiry Year
       // Sheet already stores expiry years in DATE BLS column
 
@@ -556,6 +619,7 @@ function populateTable() {
         <td class="py-3 text-cyan-400 font-semibold">${runningNumber++}</td>
         <td>${item["NAME"] || ""}</td>
         <td>${item["DEPARTMENT"] || ""}</td>
+        <td>${item["DESIGNATION"] || ""}</td>
         <td>${item["EXPIRY DATE BLS"] || ""}</td>
         <td style="color:${noBLS ? '#fecaca' : isExpired ? '#fca5a5' : isSoon ? '#fde68a' : '#86efac'}; font-weight:700;">
           ${noBLS ? "EXPIRED" : isExpired ? "EXPIRED" : isSoon ? "EXPIRING SOON" : "VALID"}
