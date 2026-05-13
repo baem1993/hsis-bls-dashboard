@@ -135,6 +135,8 @@
 </div>
 
 <script>
+const GOOGLE_API_KEY = 'AIzaSyCnLr1j8vdS6b8PKBOqV2I_Mmp9b4Yg9Ow';
+
 const SHEET_CONFIGS = [
   {
     sheetId: "1P3cJ_v4nOETcYKlVgZMnAFEs-PKnnWyhHBJ__nThj48",
@@ -186,7 +188,7 @@ const SHEET_CONFIGS = [
     nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
   },
   {
-    sheetId: "1Dupv7iNm4J21K1NeR_7vkTb9BGxc1YS6",
+    sheetId: "1EnEN-pNK1T-_C_6M1sJzUk8AS7YJq6tcCkkYD7PJvvg",
     tabName: "DATABASE RESUSITASI JABATAN",
     department: "Ophthalmology",
     nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
@@ -204,7 +206,7 @@ const SHEET_CONFIGS = [
     nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
   },
   {
-    sheetId: "1ZSYP2bmOSBjGIATenKMxgTiQgeG2vNEl",
+    sheetId: "1kih53UJOWcQ8jLZND8nEp5amYfwfEX5-nSjdUSXNcK8",
     tabName: "DATABASE RESUSITASI JABATAN",
     department: "Orthopaedic",
     nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, expiryOffsetYears: 2, startRow: 2
@@ -234,7 +236,19 @@ const SHEET_CONFIGS = [
     department: "Psychiatry",
     nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, fallbackExpiryOffsetYears: 2, startRow: 2,
     skipDesignations: ["PPP"]
-  }
+  },
+  {
+    sheetId: "1HL0pEb1ePzJXhKlj4exSfRjPefsfWJnWByUbfm6iQSs",
+    tabName: "DATABASE RESUSITASI JABATAN",
+    department: "Pulmonology",
+    nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, fallbackExpiryOffsetYears: 2, startRow: 2,
+    dateFormat: 'DMY'
+  },
+  { sheetId: "154ZSRXZCy0soXLl7lElvMKY-FS-l3YxHNpJ3Pwp0tGM", tabName: "DATABASE RESUSITASI JABATAN", department: "Radiology", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6, keepDesignations: ["PAKAR", "PEGAWAI PERUBATAN"] },
+  { sheetId: "1x_HEdwPPdEQY09pIt948kjKpa2FIHQtOn4mLYYZO2QM", tabName: "DATABASE RESUSITASI JABATAN", department: "Rehabilitation Medicine", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 },
+  { sheetId: "1EKrw10hQ_tyURhTvA4iFEoft9c3WmSBdAQQyFWjUQ7w", tabName: "DATABASE RESUSITASI JABATAN", department: "Surgical", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 },
+  { sheetId: "1WHsW1pJzDOlxgnj1Agc7XSzts606YYh5aOC56NYH4E4", tabName: "DATABASE RESUSITASI JABATAN", department: "Transfusion", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 },
+  { sheetId: "1xMa2gbHHf-5ujGN1by20e9Tp8-aOsoHjS5lRlzS41Fc", tabName: "DATABASE RESUSITASI JABATAN", department: "Urology", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 }
 ];
 
 const invalidRows = [
@@ -272,14 +286,60 @@ function setLoading(on) {
 
 async function fetchSheet(config) {
   try {
-    const rangeParam = config.range ? `&range=${config.range}` : '';
-    const url = `https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?sheet=${encodeURIComponent(config.tabName)}${rangeParam}&tq=SELECT%20*&t=${Date.now()}`;
-    const res = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
-    if (!res.ok) return [];
-    const text = await res.text();
-    if (!text.includes('google.visualization.Query.setResponse')) return [];
-    const json = JSON.parse(text.substring(47).slice(0, -2));
-    return parseDepartment(json?.table?.rows || [], config);
+    const rangeStr = config.range
+      ? `${config.tabName}!${config.range}`
+      : config.tabName;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}`
+      + `?includeGridData=true`
+      + `&ranges=${encodeURIComponent(rangeStr)}`
+      + `&key=${GOOGLE_API_KEY}`;
+
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) { console.error(`Sheets API ${res.status} for ${config.department}`); return []; }
+
+    const json = await res.json();
+    const sheet = json.sheets?.[0];
+    if (!sheet) return [];
+
+    const merges   = sheet.merges || [];
+    const gridData = sheet.data?.[0];
+    if (!gridData) return [];
+
+    const rowData  = gridData.rowData  || [];
+    const startRow = gridData.startRow    || 0;
+    const startCol = gridData.startColumn || 0;
+
+    const grid = rowData.map(row =>
+      (row.values || []).map(cell => {
+        const ev = cell.effectiveValue;
+        let v = null;
+        if (ev) {
+          if (ev.stringValue  !== undefined) v = ev.stringValue;
+          else if (ev.numberValue !== undefined) v = ev.numberValue;
+          else if (ev.boolValue   !== undefined) v = ev.boolValue;
+        }
+        return { v, f: cell.formattedValue ?? null };
+      })
+    );
+
+    merges.forEach(merge => {
+      const rStart = merge.startRowIndex    - startRow;
+      const rEnd   = merge.endRowIndex      - startRow;
+      const cStart = merge.startColumnIndex - startCol;
+      const cEnd   = merge.endColumnIndex   - startCol;
+      if (rStart < 0 || cStart < 0) return;
+      const topLeft = grid[rStart]?.[cStart];
+      if (!topLeft) return;
+      for (let r = rStart; r < rEnd; r++) {
+        for (let c = cStart; c < cEnd; c++) {
+          if (r === rStart && c === cStart) continue;
+          if (grid[r]?.[c] !== undefined) grid[r][c] = { ...topLeft };
+        }
+      }
+    });
+
+    const rows = grid.map(cells => ({ c: cells }));
+    return parseDepartment(rows, config);
   } catch (e) {
     console.error(`Fetch failed for ${config.department}:`, e);
     return [];
@@ -314,14 +374,21 @@ function parseDepartment(rows, config) {
       const desig = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim().toUpperCase();
       if (config.skipDesignations.some(d => desig.includes(d.toUpperCase()))) continue;
     }
+    // Keep only rows whose designation contains one of the allowed strings
+    if (config.keepDesignations) {
+      const desig = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim().toUpperCase();
+      if (!config.keepDesignations.some(d => desig.includes(d.toUpperCase()))) continue;
+    }
 
     const designation = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim();
 
-    let expiry = String(row[config.expiryCol]?.f ?? row[config.expiryCol]?.v ?? '').trim();
+    // Always prefer formattedValue (.f) for expiry — v4 API returns serial numbers in .v for date cells
+    const getExpiry = (col) => String(row[col]?.f ?? row[col]?.v ?? '').trim();
+    let expiry = getExpiry(config.expiryCol);
     // If primary expiry col is empty and a fallback col is configured, use it
     let usedFallback = false;
     if (!expiry && config.fallbackExpiryCol !== undefined) {
-      expiry = String(row[config.fallbackExpiryCol]?.f ?? row[config.fallbackExpiryCol]?.v ?? '').trim();
+      expiry = getExpiry(config.fallbackExpiryCol);
       usedFallback = true;
     }
     // Apply year offset: global offset applies to primary col; fallbackExpiryOffsetYears applies only when fallback was used
@@ -332,6 +399,23 @@ function parseDepartment(rows, config) {
     if (usedFallback && config.fallbackExpiryOffsetYears && expiry) {
       const yr = extractYear(expiry);
       if (!isNaN(yr)) expiry = String(yr + config.fallbackExpiryOffsetYears); // result is year format e.g. "2025"
+    }
+    // statusCol: use the sheet's own validity column as authoritative override.
+    // Applies when expiry is empty AND when our computed expiry would be EXPIRED
+    // but the sheet explicitly says "VALID" (e.g. training year stored instead of expiry year).
+    if (config.statusCol !== undefined) {
+      const statusVal = String(row[config.statusCol]?.v ?? row[config.statusCol]?.f ?? '').trim().toUpperCase();
+      if (statusVal === 'VALID') {
+        const computesExpired = (() => {
+          if (!expiry) return true;
+          const p = parseExpiryDate(expiry);
+          if (p) return new Date(p.year, p.month - 1, p.day) < new Date();
+          const yr = parseInt(expiry, 10);
+          return !isNaN(yr) && yr < new Date().getFullYear();
+        })();
+        if (computesExpired) expiry = '2099'; // far-future → VALID badge
+      }
+      // If statusVal is EXPIRED / <6/12 / empty, leave expiry as computed
     }
 
     const normalizedName = name.replace(/\s+/g, ' ').replace(/['']/g, "'").trim();
@@ -353,15 +437,64 @@ function parseDepartment(rows, config) {
       if (!hasDoctorTitle || isNonDoctor) continue;
     }
 
-    const dedupKey = upper
-      .replace(/\bBINTI\b|\bBIN\b|\bA\/P\b|\bA\/L\b|\bBINTE\b/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (seenNames.has(dedupKey)) continue;
-    seenNames.add(dedupKey);
+    if (!config.skipDedup) {
+      const dedupKey = upper
+        .replace(/\bBINTI\b|\bBIN\b|\bA\/P\b|\bA\/L\b|\bBINTE\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (seenNames.has(dedupKey)) continue;
+      seenNames.add(dedupKey);
+    }
     data.push({ NAME: normalizedName, DEPARTMENT: config.department, DESIGNATION: designation, EXPIRY: expiry });
   }
   return data;
+}
+
+function parseExpiryDate(value) {
+  // Returns { year, month (1-based), day } or null
+  const v = value.trim().toUpperCase();
+
+  // gviz: Date(YYYY,M,D) — month is 0-indexed
+  const gviz = v.match(/^DATE\((\d{4}),(\d{1,2}),(\d{1,2})\)$/);
+  if (gviz) return { year: +gviz[1], month: +gviz[2] + 1, day: +gviz[3] };
+
+  // ISO: YYYY-MM-DD
+  const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return { year: +iso[1], month: +iso[2], day: +iso[3] };
+
+  // YYYY/MM/DD
+  const ymd = v.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (ymd) return { year: +ymd[1], month: +ymd[2], day: +ymd[3] };
+
+  // D/M/YYYY or DD/MM/YYYY — if second number > 12 it must be M/D/YYYY (US format)
+  const dmy4 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy4) {
+    const a = +dmy4[1], b = +dmy4[2], y = +dmy4[3];
+    if (b > 12) return { year: y, month: a, day: b };   // M/D/YYYY
+    return { year: y, month: b, day: a };                // D/M/YYYY
+  }
+
+  // D-M-YYYY or DD-MM-YYYY
+  const dmy4d = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmy4d) return { year: +dmy4d[3], month: +dmy4d[2], day: +dmy4d[1] };
+
+  // D.M.YYYY or DD.MM.YYYY (dot-separated)
+  const dmy4dot = v.match(/^(\d{1,2})\.(\d{1,2})\.(20\d{2}|19\d{2})$/);
+  if (dmy4dot) return { year: +dmy4dot[3], month: +dmy4dot[2], day: +dmy4dot[1] };
+
+  // D/M/YY or DD/MM/YY (2-digit year → assume 2000s)
+  const dmy2 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (dmy2) return { year: 2000 + +dmy2[3], month: +dmy2[2], day: +dmy2[1] };
+
+  // M/YYYY or MM/YYYY (month + year only)
+  const my = v.match(/^(\d{1,2})\/(20\d{2}|19\d{2})$/);
+  if (my) return { year: +my[2], month: +my[1], day: 1 };
+
+  // Any string containing a 4-digit year
+  const yr = extractYear(v);
+  if (!isNaN(yr)) return { year: yr, month: 1, day: 1 };
+
+  return null;
 }
 
 function getStatus(expiry) {
@@ -371,20 +504,23 @@ function getStatus(expiry) {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
 
-  const dateMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dateMatch) {
-    const expiryDate = new Date(parseInt(dateMatch[3]), parseInt(dateMatch[2]) - 1, parseInt(dateMatch[1]));
-    if (expiryDate < currentDate) return 'EXPIRED';
-    if (parseInt(dateMatch[3]) === currentYear) return 'EXPIRING SOON';
+  // Plain year only (e.g. "2026") — no specific date, use year-level logic
+  const plainYr = parseInt(value, 10);
+  if (!isNaN(plainYr) && String(plainYr) === value.trim()) {
+    if (plainYr < currentYear) return 'EXPIRED';
+    if (plainYr === currentYear) return 'EXPIRING SOON';
     return 'VALID';
   }
 
-  const yr = parseInt(value, 10);
-  if (!isNaN(yr)) {
-    if (yr < currentYear) return 'EXPIRED';
-    if (yr === currentYear) return 'EXPIRING SOON';
+  // Specific date — follow the actual date
+  const parsed = parseExpiryDate(value);
+  if (parsed) {
+    const expiryDate = new Date(parsed.year, parsed.month - 1, parsed.day);
+    if (expiryDate < currentDate) return 'EXPIRED';
+    if (parsed.year === currentYear) return 'EXPIRING SOON';
     return 'VALID';
   }
+
   return 'VALID';
 }
 
