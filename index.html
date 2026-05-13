@@ -4,47 +4,33 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>HSIS BLS Certification Dashboard</title>
-
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
     body {
-      background: #0f172a;
-      color: white;
-      font-family: Inter, sans-serif;
+      background:#0f172a;
+      color:white;
+      font-family:Inter,sans-serif;
     }
-
     .glass {
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.08);
+      backdrop-filter:blur(12px);
     }
   </style>
 </head>
-
 <body class="p-6">
 
 <div class="mb-8">
-  <h1 class="text-4xl font-bold text-cyan-400">
-    HSIS BLS Certification Dashboard
-  </h1>
-
+  <h1 class="text-4xl font-bold text-cyan-400">HSIS BLS Certification Dashboard</h1>
   <div class="flex justify-between items-center mt-2">
     <p class="text-slate-400">Live Certification Monitoring System</p>
-
-    <div class="flex items-center gap-3">
-      <span id="lastUpdated" class="text-sm text-slate-400">
-        Last Updated: --
-      </span>
-
-      <button
-        id="refreshButton"
-        class="bg-cyan-500 hover:bg-cyan-400 px-5 py-2 rounded-xl font-semibold text-slate-900"
-      >
-        Refresh Data
-      </button>
-    </div>
+    <button id="refreshButton" class="bg-cyan-500 hover:bg-cyan-400 px-5 py-2 rounded-xl font-semibold text-slate-900 flex items-center gap-2">
+      <svg id="refreshSpinner" class="hidden animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <span id="refreshLabel">Refresh Data</span>
+    </button>
   </div>
 </div>
 
@@ -53,67 +39,89 @@
     <p class="text-slate-400">Total Staff</p>
     <h2 id="totalStaff" class="text-3xl font-bold mt-2">0</h2>
   </div>
-
   <div class="glass rounded-2xl p-5">
     <p class="text-slate-400">Staff With BLS</p>
     <h2 id="staffWithBLS" class="text-3xl font-bold text-cyan-400 mt-2">0</h2>
     <p id="staffWithBLSPercentage" class="text-sm text-slate-400 mt-2">0%</p>
   </div>
-
   <div class="glass rounded-2xl p-5">
     <p class="text-slate-400">Valid BLS</p>
     <h2 id="validBLS" class="text-3xl font-bold text-green-400 mt-2">0</h2>
     <p id="validBLSPercentage" class="text-sm text-slate-400 mt-2">0%</p>
   </div>
-
   <div class="glass rounded-2xl p-5">
     <p class="text-slate-400">Expired</p>
     <h2 id="expiredBLS" class="text-3xl font-bold text-red-400 mt-2">0</h2>
     <p id="expiredBLSPercentage" class="text-sm text-slate-400 mt-2">0%</p>
   </div>
-
   <div class="glass rounded-2xl p-5">
     <p class="text-slate-400">Expiring Soon</p>
     <h2 id="soonBLS" class="text-3xl font-bold text-yellow-400 mt-2">0</h2>
+    <p id="lastUpdated" class="text-sm text-cyan-300 mt-2">--</p>
   </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-  <div class="glass rounded-2xl p-5">
-    <h2 class="text-xl font-semibold mb-4">Certification Status</h2>
-    <canvas id="statusChart"></canvas>
+<div class="glass rounded-2xl p-5 mb-8 flex flex-col md:flex-row items-center gap-8">
+  <div class="flex flex-col items-center">
+    <h2 class="text-lg font-semibold mb-4 text-slate-300">BLS Status Overview</h2>
+    <div class="relative">
+      <svg id="donutChart" viewBox="0 0 200 200" width="200" height="200">
+        <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="32"/>
+        <circle id="donutExpired" cx="100" cy="100" r="70" fill="none" stroke="#f87171" stroke-width="32"
+          stroke-dasharray="0 440" stroke-dashoffset="0"
+          transform="rotate(-90 100 100)" style="transition:stroke-dasharray 0.6s ease,stroke-dashoffset 0.6s ease"/>
+        <circle id="donutSoon" cx="100" cy="100" r="70" fill="none" stroke="#facc15" stroke-width="32"
+          stroke-dasharray="0 440" stroke-dashoffset="0"
+          transform="rotate(-90 100 100)" style="transition:stroke-dasharray 0.6s ease,stroke-dashoffset 0.6s ease"/>
+        <circle id="donutValid" cx="100" cy="100" r="70" fill="none" stroke="#4ade80" stroke-width="32"
+          stroke-dasharray="0 440" stroke-dashoffset="0"
+          transform="rotate(-90 100 100)" style="transition:stroke-dasharray 0.6s ease,stroke-dashoffset 0.6s ease"/>
+        <text id="donutCenterPct" x="100" y="90" text-anchor="middle" fill="white" font-size="28" font-weight="bold" font-family="Inter,sans-serif">0%</text>
+        <text x="100" y="110" text-anchor="middle" fill="#4ade80" font-size="11" font-family="Inter,sans-serif">BLS Compliant</text>
+        <text id="donutCenterDept" x="100" y="127" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">All Departments</text>
+      </svg>
+    </div>
   </div>
-
-  <div class="glass rounded-2xl p-5">
-    <h2 class="text-xl font-semibold mb-4">Department Compliance</h2>
-    <canvas id="deptChart"></canvas>
+  <div class="flex flex-col gap-4 text-sm flex-1">
+    <div class="flex items-center justify-between gap-6 glass rounded-xl px-5 py-3">
+      <div class="flex items-center gap-3">
+        <span class="w-3 h-3 rounded-full bg-green-400 flex-shrink-0"></span>
+        <span class="text-slate-300">Valid BLS</span>
+      </div>
+      <span id="donutLabelValid" class="font-bold text-green-400 text-base">0</span>
+    </div>
+    <div class="flex items-center justify-between gap-6 glass rounded-xl px-5 py-3">
+      <div class="flex items-center gap-3">
+        <span class="w-3 h-3 rounded-full bg-yellow-400 flex-shrink-0"></span>
+        <span class="text-slate-300">Expiring Soon</span>
+      </div>
+      <span id="donutLabelSoon" class="font-bold text-yellow-400 text-base">0</span>
+    </div>
+    <div class="flex items-center justify-between gap-6 glass rounded-xl px-5 py-3">
+      <div class="flex items-center gap-3">
+        <span class="w-3 h-3 rounded-full bg-red-400 flex-shrink-0"></span>
+        <span class="text-slate-300">Expired</span>
+      </div>
+      <span id="donutLabelExpired" class="font-bold text-red-400 text-base">0</span>
+    </div>
   </div>
 </div>
 
-<div id="mainDashboardContainer" class="glass rounded-2xl p-5 overflow-auto">
+<div class="glass rounded-2xl p-5 overflow-auto">
   <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
     <h2 class="text-xl font-semibold">Staff Certification Records</h2>
-
     <div class="flex flex-wrap gap-3">
       <select id="departmentFilter" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white">
         <option value="ALL">All Departments</option>
       </select>
-
       <select id="blsStatusFilter" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white">
         <option value="ALL">All BLS Status</option>
         <option value="VALID">Valid BLS</option>
         <option value="NOT_VALID">Not Valid BLS</option>
       </select>
-
-      <input
-        type="text"
-        id="searchInput"
-        placeholder="Search staff..."
-        class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white"
-      />
+      <input id="searchInput" type="text" placeholder="Search staff..." class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white" />
     </div>
   </div>
-
   <table class="w-full text-left">
     <thead>
       <tr class="text-cyan-400 border-b border-slate-700">
@@ -125,715 +133,409 @@
         <th>Status</th>
       </tr>
     </thead>
-
     <tbody id="tableBody"></tbody>
   </table>
 </div>
 
 <script>
-
-/*
-====================================================
-DEPARTMENT PARSER BACKEND NOTES
-====================================================
-
-RULE:
-1 Department = 1 Dedicated Parser
-
-Each department MUST have:
-- own row mapping
-- own column mapping
-- own filtering logic
-- own isolated parser block
-
-----------------------------------------------------
-ANAESTHESIA
-----------------------------------------------------
-Sheet:
-DATABASE RESUSITASI JABATAN
-
-Row Mapping:
-Data starts row 7
-
-Column Mapping:
-Name = Column C
-Designation = Column E
-Expiry Year = Column I
-
-Filtering:
-- remove PEGAWAI rows
-- remove TOTAL rows
-- remove BLS VALID rows
-
-----------------------------------------------------
-NEPHROLOGY
-----------------------------------------------------
-Sheet:
-DATABASE RESUSITASI JABATAN
-
-Row Mapping:
-Data starts row 7
-
-Column Mapping:
-Name = Column C
-Designation = Column E
-Expiry Year = Column I
-
-Filtering:
-- designation cannot be empty
-- remove DIKEMASKINI OLEH
-- remove NEPHROLOGIST
-- remove PEGAWAI rows
-
-----------------------------------------------------
-CARDIOLOGY
-----------------------------------------------------
-Sheet:
-PAKAR ,MO
-
-Row Mapping:
-Data starts row 7
-
-Column Mapping:
-Name = Column C
-Designation = Column F
-Expiry Year = Column J
-
-Filtering:
-- designation cannot be empty
-- remove PEGAWAI rows
-
-====================================================
-ADDING FUTURE DEPARTMENTS
-====================================================
-
-1. Add new SHEET_CONFIGS entry
-2. Create dedicated parser block:
-
-if (config.department === "NEW_DEPARTMENT") {
-   ...
-}
-
-3. NEVER modify existing department parser
-4. Keep all department parsers isolated
-
-====================================================
-*/
-
 const SHEET_CONFIGS = [
   {
     sheetId: "1P3cJ_v4nOETcYKlVgZMnAFEs-PKnnWyhHBJ__nThj48",
     tabName: "DATABASE RESUSITASI JABATAN",
     department: "Nephrology",
-    expiryHeader: "EXPIRY DATE BLS"
+    nameCol: 2,
+    designationCol: 4,
+    expiryCol: 8,
+    startRow: 6
   },
   {
     sheetId: "1oP9SiAHGuJpcWaSB5NjlzY56K3D4nCNZ4hdMl_kLwLw",
     tabName: "PAKAR ,MO",
     department: "Cardiology",
-    expiryHeader: "EXPIRY DATE BLS"
+    nameCol: 2,
+    designationCol: 5,
+    expiryCol: 9,
+    startRow: 2
+  },
+  {
+    sheetId: "1La2QBMhEr2w4Qwo7DkBW1AiylmLJQn7BdIisT-TzNZc",
+    tabName: "DATABASE RESUSITASI JABATAN",
+    department: "Cardiothoracic Anaesthesia",
+    range: "B7:J80",
+    nameCol: 1,
+    designationCol: 3,
+    expiryCol: 7,
+    startRow: 0
   },
   {
     sheetId: "1aEk6QbghRafXg-arqt4jcTCk0pcvedmeszQjzxYpUSA",
     tabName: "DATABASE RESUSITASI JABATAN",
     department: "Anaesthesia",
-    expiryHeader: "EXPIRY DATE BLS"
+    nameCol: 2,
+    designationCol: 4,
+    expiryCol: 8,
+    startRow: 2
+  },
+  {
+    sheetId: "1z-aTRixj_tV4FuDl6P9JclyC1sj3wObbMXoXYYLZ_Gk",
+    tabName: "DATABASE RESUSITASI JABATAN",
+    department: "Cardiothoracic",
+    nameCol: 2,
+    designationCol: 4,
+    expiryCol: 7,
+    expiryOffsetYears: 2,
+    startRow: 2
+  },
+  {
+    sheetId: "1KhMoCpCcjXKkFlOMiGHatZycyjFb_E0gZ1HnMwyK8co",
+    tabName: "2025 - DATA RESUSITASI EP/MO",
+    department: "Emergency",
+    nameCol: 1,
+    designationCol: 3,
+    expiryCol: 7,
+    startRow: 0
   }
+];
+
+const invalidRows = [
+  "VALID","EXPIRED","JUMLAH","TOTAL","%","BELUM",
+  "ALS","ACLS","NRP","PPS","BLS VALID","EXPIRED BLS",
+  "BELUM AMBIL BLS","TOTAL STAF","< 6/12:",
+  "% BLS VALID","ALS/ACLS VALID","EXPIRED ALS/ACLS",
+  "BELUM AMBIL ALS/ACLS","% ALS/ACLS VALID",
+  "PPP U5","PALS VALID","EXPIRED PALS",
+  "BELUM AMBIL PALS",
+  "DR","MR","MS","MISS","DATO","DATUK"
 ];
 
 let allData = [];
 let filteredData = [];
-let currentDepartment = "ALL";
-let currentBLSStatus = "ALL";
-let statusChartInstance = null;
-let deptChartInstance = null;
-let autoRefreshHandle = null;
+let currentDepartment = 'ALL';
+let currentBLSStatus = 'ALL';
+let currentSearch = '';
 
-const invalidRows = [
-  "VALID",
-  "EXPIRED",
-  "JUMLAH",
-  "TOTAL",
-  "%",
-  "BELUM",
-  "ALS",
-  "ACLS",
-  "NRP",
-  "PPS",
-  "BLS VALID",
-  "EXPIRED BLS",
-  "BELUM AMBIL BLS",
-  "% BLS VALID",
-  "ALS/ACLS VALID",
-  "EXPIRED ALS/ACLS",
-  "BELUM AMBIL ALS/ACLS",
-  "% ALS/ACLS VALID",
-  "< 6/12:",
-  "TOTAL STAF"
-];
+function safeSetText(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+}
+
+function setLoading(on) {
+  const spinner = document.getElementById('refreshSpinner');
+  const label   = document.getElementById('refreshLabel');
+  const btn     = document.getElementById('refreshButton');
+  if (spinner) spinner.classList.toggle('hidden', !on);
+  if (label)   label.textContent = on ? 'Loading...' : 'Refresh Data';
+  if (btn)     btn.disabled = on;
+}
 
 async function fetchSheet(config) {
   try {
-
-    const url = `https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?sheet=${encodeURIComponent(config.tabName)}&tq=SELECT%20*&t=${Date.now()}`;
-
-    const response = await fetch(url, {
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      return [];
-    }
-
+    const rangeParam = config.range ? `&range=${config.range}` : '';
+    const url = `https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?sheet=${encodeURIComponent(config.tabName)}${rangeParam}&tq=SELECT%20*&t=${Date.now()}`;
+    const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
+    if (!response.ok) return [];
     const text = await response.text();
-
+    if (!text.includes('google.visualization.Query.setResponse')) return [];
     const json = JSON.parse(text.substring(47).slice(0, -2));
-
     const rows = json?.table?.rows || [];
-
-    if (!rows.length) {
-      return [];
-    }
-
-    // Nephrology parser
-    if (config.department === "Nephrology") {
-
-      const nephrologyData = [];
-
-      for (let i = 6; i < rows.length; i++) {
-
-        const row = rows[i].c || [];
-
-        const staffName = row[2]?.f || row[2]?.v || "";
-
-        if (!staffName) continue;
-
-        const cleanName = String(staffName)
-          .trim()
-          .replace(/\s+/g, ' ');
-
-        const upperName = cleanName.toUpperCase();
-
-        const designation =
-          row[4]?.f ||
-          row[4]?.v ||
-          "";
-
-        if (
-          !cleanName ||
-          !String(designation).trim() ||
-          invalidRows.includes(upperName) ||
-          upperName.startsWith("PEGAWAI") ||
-          upperName.includes("DIKEMASKINI OLEH") ||
-          upperName.includes("NEPHROLOGIST")
-        ) {
-          continue;
-        }
-
-        nephrologyData.push({
-          NAME: cleanName,
-          DEPARTMENT: "Nephrology",
-          DESIGNATION: designation,
-          "EXPIRY DATE BLS":
-            row[8]?.f ||
-            row[8]?.v ||
-            ""
-        });
-      }
-
-      return nephrologyData;
-    }
-
-    // Cardiology parser
-    if (config.department === "Cardiology") {
-
-      const cardiologyData = [];
-
-      // Row 7 onwards
-      for (let i = 6; i < rows.length; i++) {
-
-        const row = rows[i].c || [];
-
-        // Column C = Name
-        const staffName = row[2]?.f || row[2]?.v || "";
-
-        if (!staffName) continue;
-
-        const cleanName = String(staffName)
-          .trim()
-          .replace(/\s+/g, ' ');
-
-        const upperName = cleanName.toUpperCase();
-
-        // Column F = Designation
-        const designation =
-          row[5]?.f ||
-          row[5]?.v ||
-          "";
-
-        if (
-          !cleanName ||
-          !String(designation).trim() ||
-          invalidRows.includes(upperName) ||
-          upperName.startsWith("PEGAWAI")
-        ) {
-          continue;
-        }
-
-        cardiologyData.push({
-          NAME: cleanName,
-          DEPARTMENT: "Cardiology",
-          DESIGNATION: designation,
-
-          // Column J = Expiry Year
-          "EXPIRY DATE BLS":
-            row[9]?.f ||
-            row[9]?.v ||
-            ""
-        });
-      }
-
-      return cardiologyData;
-    }
-
-    // Anaesthesia parser
-    let headerRowIndex = -1;
-
-    rows.forEach((row, rowIndex) => {
-      row.c?.forEach(cell => {
-        const value = String(cell?.v || "")
-          .trim()
-          .toUpperCase();
-
-        if (value === "NAME") {
-          headerRowIndex = rowIndex;
-        }
-      });
-    });
-
-    if (headerRowIndex === -1) {
-      return [];
-    }
-
-    const headers = rows[headerRowIndex].c.map(col =>
-      col?.v ? String(col.v).trim().toUpperCase() : ""
-    );
-
-    const data = [];
-
-    for (let i = headerRowIndex + 1; i < rows.length; i++) {
-
-      const row = rows[i].c || [];
-      const obj = {};
-
-      headers.forEach((header, index) => {
-        if (!header) return;
-
-        obj[header] = row[index]?.f || row[index]?.v || "";
-      });
-
-      const name = String(obj["NAME"] || "").trim();
-
-      if (
-        !name ||
-        invalidRows.includes(name.toUpperCase()) ||
-        name.toUpperCase().startsWith("PEGAWAI")
-      ) {
-        continue;
-      }
-
-      obj["DEPARTMENT"] = config.department;
-
-      // Anaesthesia Designation = Column E
-      // Data starts row 7
-      obj["DESIGNATION"] =
-        row[4]?.f ||
-        row[4]?.v ||
-        "";
-      // Use DATE BLS column values directly as Expiry Year
-      // Sheet already stores expiry years in DATE BLS column
-
-      // Use actual sheet Column I values directly
-      // Google Sheet: I6 and below
-
-      obj["EXPIRY DATE BLS"] =
-        row[8]?.f ||
-        row[8]?.v ||
-        obj[config.expiryHeader.toUpperCase()] ||
-        obj["VALIDITY BLS"] ||
-        obj["EXPIRY"] ||
-        "";
-
-      data.push(obj);
-    }
-
-    return data;
-
+    return parseDepartment(rows, config);
   } catch (error) {
-    console.error(`Fetch error for ${config.department}:`, error);
+    console.error(`Fetch failed for ${config.department}:`, error);
     return [];
   }
 }
 
-function calculateMonthsLeft(expiryValue) {
-  if (!expiryValue) return null;
+function parseDepartment(rows, config) {
+  const data = [];
+  for (let i = config.startRow; i < rows.length; i++) {
+    const row = rows[i]?.c || [];
 
-  const value = String(expiryValue).trim();
+    const name = String(
+      row[config.nameCol]?.v ??
+      row[config.nameCol]?.f ??
+      ''
+    ).trim();
 
-  if (["N/A", "VALID", "EXPIRED", ""].includes(value.toUpperCase())) {
-    return null;
+    if (!name || name === 'undefined') continue;
+
+    const designation = String(
+      row[config.designationCol]?.v ??
+      row[config.designationCol]?.f ??
+      ''
+    ).trim();
+
+    let expiry = String(
+      row[config.expiryCol]?.f ??
+      row[config.expiryCol]?.v ??
+      ''
+    ).trim();
+
+    if (config.expiryOffsetYears && expiry) {
+      const yr = parseInt(expiry, 10);
+      if (!isNaN(yr)) expiry = String(yr + config.expiryOffsetYears);
+    }
+
+    const normalizedName = name
+      .replace(/\s+/g, ' ')
+      .replace(/['']/g, "'")
+      .trim();
+
+    const upper = normalizedName.toUpperCase();
+
+    if (
+      invalidRows.includes(upper) ||
+      upper.startsWith('PEGAWAI') ||
+      upper.includes('DIKEMASKINI') ||
+      upper.includes('NEPHROLOGIST') ||
+      /^\d+$/.test(upper)
+    ) continue;
+
+    if (config.department === 'Cardiothoracic Anaesthesia') {
+      const normalizedUpper = upper
+        .replace(/\./g, '')
+        .replace(/`/g, '')
+        .replace(/[']/g, '')
+        .replace(/'/g, '')
+        .replace(/'/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const doctorKeywords = ['DR', 'DATO', 'MR', 'MISS', 'MS'];
+      const hasDoctorTitle = doctorKeywords.some(k => normalizedUpper.startsWith(k));
+
+      const nonDoctorKeywords = [
+        'PPP','PENYELIA PPP','JURURAWAT','STAFF NURSE',
+        'MA','PEMBANTU','ASSISTANT','U5','U6','U7','U8','U9'
+      ];
+      const isNonDoctor = nonDoctorKeywords.some(k => designation.toUpperCase().includes(k));
+
+      if (!hasDoctorTitle || isNonDoctor) continue;
+    }
+
+    data.push({
+      NAME: normalizedName,
+      DEPARTMENT: config.department,
+      DESIGNATION: designation,
+      EXPIRY: expiry
+    });
   }
+  return data;
+}
 
-  let expiryDate = null;
+function getStatus(expiry) {
+  const value = String(expiry || '').trim().toUpperCase();
 
-  if (/^\d{4}$/.test(value)) {
-    expiryDate = new Date(parseInt(value), 11, 31);
-  }
-  else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(value)) {
-
-    const parts = value.split(/[\/\-]/);
-
-    expiryDate = new Date(
-      parseInt(parts[2]),
-      parseInt(parts[1]) - 1,
-      parseInt(parts[0])
-    );
-  }
-  else {
-    expiryDate = new Date(value);
-  }
-
-  if (!expiryDate || isNaN(expiryDate.getTime())) {
-    return null;
+  if (value === '' || value === '-' || value === 'N/A' || value === 'EXPIRED' || value.includes('NO BLS')) {
+    return 'EXPIRED';
   }
 
   const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
 
-  const diffTime = expiryDate.getTime() - currentDate.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const dateMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dateMatch) {
+    const expiryDate = new Date(parseInt(dateMatch[3]), parseInt(dateMatch[2]) - 1, parseInt(dateMatch[1]));
+    if (expiryDate < currentDate) return 'EXPIRED';
+    if (parseInt(dateMatch[3]) === currentYear) return 'EXPIRING SOON';
+    return 'VALID';
+  }
 
-  return Math.floor(diffDays / 30);
-}
+  const expiryYear = parseInt(value, 10);
+  if (!isNaN(expiryYear)) {
+    if (expiryYear < currentYear) return 'EXPIRED';
+    if (expiryYear === currentYear) return 'EXPIRING SOON';
+    return 'VALID';
+  }
 
-function populateDepartmentDropdown() {
-
-  const select = document.getElementById("departmentFilter");
-
-  if (!select) return;
-
-  const departments = [...new Set(allData.map(x => x["DEPARTMENT"]))];
-
-  select.innerHTML = `<option value="ALL">All Departments</option>`;
-
-  departments.sort().forEach(dep => {
-    select.innerHTML += `<option value="${dep}">${dep}</option>`;
-  });
+  return 'VALID';
 }
 
 async function loadData() {
-
+  setLoading(true);
   allData = [];
 
   for (const config of SHEET_CONFIGS) {
-
-    const rows = await fetchSheet(config);
-
-    allData.push(...rows);
+    try {
+      const rows = await fetchSheet(config);
+      allData.push(...rows);
+    } catch (e) {
+      console.error(`Failed to load ${config.department}:`, e);
+    }
+    await new Promise(r => setTimeout(r, 300));
   }
 
   populateDepartmentDropdown();
   processDashboard();
+  safeSetText('lastUpdated', new Date().toLocaleString());
+  setLoading(false);
+}
 
-  const lastUpdated = document.getElementById("lastUpdated");
-
-  if (lastUpdated) {
-    lastUpdated.innerText = `Last Updated: ${new Date().toLocaleString()}`;
-  }
+function populateDepartmentDropdown() {
+  const select = document.getElementById('departmentFilter');
+  if (!select) return;
+  select.innerHTML = '<option value="ALL">All Departments</option>';
+  [...new Set(allData.map(x => x.DEPARTMENT))]
+    .sort()
+    .forEach(dep => {
+      const selected = dep === currentDepartment ? ' selected' : '';
+      select.innerHTML += `<option value="${dep}"${selected}>${dep}</option>`;
+    });
 }
 
 function processDashboard() {
-
   filteredData = [...allData];
 
-  if (currentDepartment !== "ALL") {
-    filteredData = filteredData.filter(item =>
-      item["DEPARTMENT"] === currentDepartment
+  if (currentDepartment !== 'ALL') {
+    filteredData = filteredData.filter(x => x.DEPARTMENT === currentDepartment);
+  }
+  if (currentBLSStatus === 'VALID') {
+    filteredData = filteredData.filter(x => getStatus(x.EXPIRY) === 'VALID');
+  }
+  if (currentBLSStatus === 'NOT_VALID') {
+    filteredData = filteredData.filter(x => getStatus(x.EXPIRY) !== 'VALID');
+  }
+  if (currentSearch) {
+    const q = currentSearch.toLowerCase();
+    filteredData = filteredData.filter(x =>
+      x.NAME.toLowerCase().includes(q) ||
+      x.DEPARTMENT.toLowerCase().includes(q) ||
+      x.DESIGNATION.toLowerCase().includes(q)
     );
   }
 
-  filteredData = filteredData.filter(item => {
+  const total   = filteredData.length;
+  const valid   = filteredData.filter(x => getStatus(x.EXPIRY) === 'VALID').length;
+  const expired = filteredData.filter(x => getStatus(x.EXPIRY) === 'EXPIRED').length;
+  const soon    = filteredData.filter(x => getStatus(x.EXPIRY) === 'EXPIRING SOON').length;
 
-    const monthsLeft = calculateMonthsLeft(item["EXPIRY DATE BLS"]);
+  safeSetText('totalStaff', total);
+  safeSetText('staffWithBLS', total);
+  safeSetText('validBLS', valid);
+  safeSetText('expiredBLS', expired);
+  safeSetText('soonBLS', soon);
+  safeSetText('staffWithBLSPercentage', total ? '100%' : '0%');
+  safeSetText('validBLSPercentage', total ? `${((valid / total) * 100).toFixed(1)}%` : '0%');
+  safeSetText('expiredBLSPercentage', total ? `${((expired / total) * 100).toFixed(1)}%` : '0%');
 
-    const expiryText = String(item["EXPIRY DATE BLS"] || "")
-        .toUpperCase()
-        .trim();
-
-    const normalizedExpiry = expiryText
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const noBLS =
-      normalizedExpiry === "" ||
-      normalizedExpiry === "-" ||
-      normalizedExpiry === "N/A" ||
-      normalizedExpiry.includes("NO BLS");
-
-    const currentYear = new Date().getFullYear();
-
-    const expiryYear = parseInt(expiryText);
-
-    const isExpired =
-      noBLS || (
-        !Number.isNaN(expiryYear) &&
-        expiryYear < currentYear
-      );
-
-    if (currentBLSStatus === "VALID") {
-      return !isExpired;
-    }
-
-    if (currentBLSStatus === "NOT_VALID") {
-      return isExpired;
-    }
-
-    return true;
-  });
-
-  let valid = 0;
-  let expired = 0;
-  let soon = 0;
-
-  const deptMap = {};
-
-  filteredData.forEach(item => {
-
-    const monthsLeft = calculateMonthsLeft(item["EXPIRY DATE BLS"]);
-
-    const expiryText = String(item["EXPIRY DATE BLS"] || "")
-        .toUpperCase()
-        .trim();
-
-    const normalizedExpiry = expiryText
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const noBLS =
-      normalizedExpiry === "" ||
-      normalizedExpiry === "-" ||
-      normalizedExpiry === "N/A" ||
-      normalizedExpiry.includes("NO BLS");
-
-    const currentYear = new Date().getFullYear();
-
-    const expiryYear = parseInt(expiryText);
-
-    const isExpired =
-      noBLS || (
-        !Number.isNaN(expiryYear) &&
-        expiryYear < currentYear
-      );
-
-    const isSoon =
-      !isExpired &&
-      !noBLS &&
-      !Number.isNaN(expiryYear) &&
-      expiryYear === currentYear;
-
-    if (isExpired) expired++;
-    else if (isSoon) {
-      valid++;
-      soon++;
-    }
-    else {
-      valid++;
-    }
-
-    deptMap[item["DEPARTMENT"]] =
-      (deptMap[item["DEPARTMENT"]] || 0) + 1;
-  });
-
-  const total = filteredData.length;
-
-  document.getElementById("totalStaff").innerText = total;
-  const staffWithBLS = filteredData.filter(item => {
-    const expiryText = String(item["EXPIRY DATE BLS"] || "")
-      .toUpperCase()
-      .trim();
-
-    return expiryText !== "" && expiryText !== "-" && expiryText !== "N/A";
-  }).length;
-
-  document.getElementById("staffWithBLS").innerText = staffWithBLS;
-  document.getElementById("staffWithBLSPercentage").innerText = `${total ? ((staffWithBLS / total) * 100).toFixed(1) : 0}%`;
-  document.getElementById("validBLS").innerText = valid;
-  document.getElementById("validBLSPercentage").innerText = `${total ? ((valid / total) * 100).toFixed(1) : 0}%`;
-  document.getElementById("expiredBLS").innerText = expired;
-  document.getElementById("expiredBLSPercentage").innerText = `${total ? ((expired / total) * 100).toFixed(1) : 0}%`;
-  document.getElementById("soonBLS").innerText = soon;
-
-  buildCharts(valid, expired, soon, deptMap);
+  updateDonut(valid, soon, expired);
   populateTable();
 }
 
-function buildCharts(valid, expired, soon, deptMap) {
-
-  const statusCanvas = document.getElementById("statusChart");
-  const deptCanvas = document.getElementById("deptChart");
-
-  if (!statusCanvas || !deptCanvas) return;
-
-  if (statusChartInstance) statusChartInstance.destroy();
-  if (deptChartInstance) deptChartInstance.destroy();
-
-  const total = valid + expired + soon;
-
-  statusChartInstance = new Chart(statusCanvas, {
-    type: "doughnut",
-    data: {
-      labels: [
-        `Valid (${total ? ((valid / total) * 100).toFixed(1) : 0}%)`,
-        `Expired (${total ? ((expired / total) * 100).toFixed(1) : 0}%)`,
-        `Expiring Soon (${total ? ((soon / total) * 100).toFixed(1) : 0}%)`
-      ],
-      datasets: [{
-        data: [valid, expired, soon],
-        backgroundColor: ["#22c55e", "#ef4444", "#facc15"]
-      }]
-    }
-  });
-
-  deptChartInstance = new Chart(deptCanvas, {
-    type: "bar",
-    data: {
-      labels: Object.keys(deptMap),
-      datasets: [{
-        label: "Staff",
-        data: Object.values(deptMap),
-        backgroundColor: "#06b6d4"
-      }]
-    }
-  });
-}
-
-
-
 function populateTable() {
-
-  const tbody = document.getElementById("tableBody");
-
+  const tbody = document.getElementById('tableBody');
   if (!tbody) return;
-
-  tbody.innerHTML = "";
-
-  let runningNumber = 1;
-
-  filteredData.forEach(item => {
-
-    const monthsLeft = calculateMonthsLeft(item["EXPIRY DATE BLS"]);
-
-    const expiryText = String(item["EXPIRY DATE BLS"] || "")
-        .toUpperCase()
-        .trim();
-
-    const normalizedExpiry = expiryText
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const noBLS =
-      normalizedExpiry === "" ||
-      normalizedExpiry === "-" ||
-      normalizedExpiry === "N/A" ||
-      normalizedExpiry.includes("NO BLS");
-
-    const currentYear = new Date().getFullYear();
-
-    const expiryYear = parseInt(expiryText);
-
-    const isExpired =
-      noBLS || (
-        !Number.isNaN(expiryYear) &&
-        expiryYear < currentYear
-      );
-
-    const isSoon =
-      !isExpired &&
-      !noBLS &&
-      !Number.isNaN(expiryYear) &&
-      expiryYear === currentYear;
-
+  tbody.innerHTML = '';
+  filteredData.forEach((item, index) => {
+    const status = getStatus(item.EXPIRY);
+    let bg = 'transparent';
+    if (status === 'EXPIRED') bg = 'rgba(127,29,29,0.9)';
+    if (status === 'EXPIRING SOON') bg = 'rgba(113,63,18,0.8)';
     tbody.innerHTML += `
-      <tr style="background-color:${noBLS ? 'rgba(153,27,27,0.95)' : isExpired ? 'rgba(127,29,29,0.9)' : isSoon ? 'rgba(113,63,18,0.8)' : 'transparent'}">
-        <td class="py-3 text-cyan-400 font-semibold">${runningNumber++}</td>
-        <td>${item["NAME"] || ""}</td>
-        <td>${item["DEPARTMENT"] || ""}</td>
-        <td>${item["DESIGNATION"] || ""}</td>
-        <td>${item["EXPIRY DATE BLS"] || ""}</td>
-        <td style="color:${noBLS ? '#fecaca' : isExpired ? '#fca5a5' : isSoon ? '#fde68a' : '#86efac'}; font-weight:700;">
-          ${noBLS ? "EXPIRED" : isExpired ? "EXPIRED" : isSoon ? "EXPIRING SOON" : "VALID"}
-        </td>
+      <tr style="background-color:${bg}">
+        <td class="py-3 text-cyan-400 font-semibold">${index + 1}</td>
+        <td>${item.NAME}</td>
+        <td>${item.DEPARTMENT}</td>
+        <td>${item.DESIGNATION}</td>
+        <td>${item.EXPIRY}</td>
+        <td>${status}</td>
       </tr>
     `;
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function setDonutDeptText(name) {
+  const el = document.getElementById('donutCenterDept');
+  if (!el) return;
+  while (el.firstChild) el.removeChild(el.firstChild);
 
-  const departmentFilter = document.getElementById("departmentFilter");
-  const blsStatusFilter = document.getElementById("blsStatusFilter");
-  const searchInput = document.getElementById("searchInput");
-  const refreshButton = document.getElementById("refreshButton");
-
-  if (departmentFilter) {
-    departmentFilter.addEventListener("change", function() {
-      currentDepartment = this.value;
-      processDashboard();
-    });
+  const words = name.split(' ');
+  if (words.length === 1 || name.length <= 15) {
+    el.setAttribute('y', '127');
+    el.textContent = name;
+    return;
   }
 
-  if (blsStatusFilter) {
-    blsStatusFilter.addEventListener("change", function() {
-      currentBLSStatus = this.value;
-      processDashboard();
+  const mid   = Math.ceil(words.length / 2);
+  const line1 = words.slice(0, mid).join(' ');
+  const line2 = words.slice(mid).join(' ');
+
+  el.setAttribute('y', '121');
+  const ns = 'http://www.w3.org/2000/svg';
+  const t1 = document.createElementNS(ns, 'tspan');
+  t1.setAttribute('x', '100'); t1.setAttribute('dy', '0');  t1.textContent = line1;
+  const t2 = document.createElementNS(ns, 'tspan');
+  t2.setAttribute('x', '100'); t2.setAttribute('dy', '12'); t2.textContent = line2;
+  el.appendChild(t1);
+  el.appendChild(t2);
+}
+
+function updateDonut(valid, soon, expired) {
+  const total = valid + soon + expired;
+  const r = 70;
+  const circumference = 2 * Math.PI * r;
+
+  const compliancePct = total ? ((valid / total) * 100).toFixed(1) + '%' : '0%';
+  const deptLabel = currentDepartment === 'ALL' ? 'All Departments' : currentDepartment;
+
+  safeSetText('donutCenterPct', compliancePct);
+  setDonutDeptText(deptLabel);
+  safeSetText('donutLabelValid', valid);
+  safeSetText('donutLabelSoon', soon);
+  safeSetText('donutLabelExpired', expired);
+
+  if (total === 0) {
+    ['donutValid', 'donutSoon', 'donutExpired'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.setAttribute('stroke-dasharray', `0 ${circumference}`);
+        el.setAttribute('stroke-dashoffset', '0');
+      }
     });
+    return;
   }
 
-  if (searchInput) {
-    searchInput.addEventListener("keyup", function() {
+  const validArc   = (valid   / total) * circumference;
+  const soonArc    = (soon    / total) * circumference;
+  const expiredArc = (expired / total) * circumference;
 
-      const value = this.value.toLowerCase();
+  const segments = [
+    { id: 'donutValid',   arc: validArc,   prev: 0 },
+    { id: 'donutSoon',    arc: soonArc,    prev: validArc },
+    { id: 'donutExpired', arc: expiredArc, prev: validArc + soonArc }
+  ];
 
-      document.querySelectorAll("#tableBody tr")
-        .forEach(row => {
-          row.style.display = row.innerText.toLowerCase().includes(value)
-            ? ""
-            : "none";
-        });
-    });
-  }
+  segments.forEach(({ id, arc, prev }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute('stroke-dasharray', `${arc} ${circumference - arc}`);
+    el.setAttribute('stroke-dashoffset', circumference - prev);
+  });
+}
 
-  if (refreshButton) {
-    refreshButton.addEventListener("click", async () => {
-      await loadData();
-    });
-  }
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('departmentFilter')?.addEventListener('change', e => {
+    currentDepartment = e.target.value;
+    processDashboard();
+  });
+  document.getElementById('blsStatusFilter')?.addEventListener('change', e => {
+    currentBLSStatus = e.target.value;
+    processDashboard();
+  });
+  document.getElementById('searchInput')?.addEventListener('input', e => {
+    currentSearch = e.target.value;
+    processDashboard();
+  });
+  document.getElementById('refreshButton')?.addEventListener('click', async () => {
+    await loadData();
+  });
 
   loadData();
 
-  if (autoRefreshHandle) {
-    clearInterval(autoRefreshHandle);
-  }
-
-  autoRefreshHandle = setInterval(async () => {
-    try {
-      await loadData();
-    }
-    catch (error) {
-      console.error("Auto refresh failed:", error);
-    }
+  setInterval(async () => {
+    try { await loadData(); } catch (e) { console.error('Auto refresh failed:', e); }
   }, 60000);
 });
-
 </script>
 
 </body>
