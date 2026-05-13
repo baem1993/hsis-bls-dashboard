@@ -273,6 +273,10 @@ function parseDepartment(rows, config) {
 
     const name = String(row[config.nameCol]?.v ?? row[config.nameCol]?.f ?? '').trim();
     if (!name || name === 'undefined') continue;
+    // Stop parsing when we hit footer markers
+    if (/DIKEMASKINI/i.test(name)) break;
+    // Skip dash-only or punctuation-only names
+    if (/^[-–—*#.]+$/.test(name)) continue;
 
     const designation = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim();
 
