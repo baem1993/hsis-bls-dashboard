@@ -201,6 +201,12 @@ const SHEET_CONFIGS = [
     tabName: "DATABASE RESUSITASI JABATAN",
     department: "Otorhinolaryngology",
     nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
+  },
+  {
+    sheetId: "1ZSYP2bmOSBjGIATenKMxgTiQgeG2vNEl",
+    tabName: "DATABASE RESUSITASI JABATAN",
+    department: "Orthopaedic",
+    nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, expiryOffsetYears: 2, startRow: 2
   }
 ];
 
@@ -265,6 +271,10 @@ function parseDepartment(rows, config) {
     const designation = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim();
 
     let expiry = String(row[config.expiryCol]?.f ?? row[config.expiryCol]?.v ?? '').trim();
+    // If primary expiry col is empty and a fallback col is configured, use it
+    if (!expiry && config.fallbackExpiryCol !== undefined) {
+      expiry = String(row[config.fallbackExpiryCol]?.f ?? row[config.fallbackExpiryCol]?.v ?? '').trim();
+    }
     if (config.expiryOffsetYears && expiry) {
       const yr = parseInt(expiry, 10);
       if (!isNaN(yr)) expiry = String(yr + config.expiryOffsetYears);
