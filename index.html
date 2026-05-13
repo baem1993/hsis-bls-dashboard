@@ -346,7 +346,8 @@ function populateDepartmentDropdown() {
   const select = document.getElementById('departmentFilter');
   if (!select) return;
   select.innerHTML = '<option value="ALL">All Departments</option>';
-  [...new Set(allData.map(x => x.DEPARTMENT))].sort().forEach(dep => {
+  // Always show all configured departments, even if no data loaded yet
+  SHEET_CONFIGS.map(c => c.department).forEach(dep => {
     select.innerHTML += `<option value="${dep}"${dep === currentDepartment ? ' selected' : ''}>${dep}</option>`;
   });
 }
