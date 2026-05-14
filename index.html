@@ -97,7 +97,6 @@
   </div>
 </div>
 
-<!-- Department compliance chart — only shown when All Departments is selected -->
 <div id="deptChartCard" class="glass rounded-2xl p-6 mb-8 hidden">
   <h2 class="text-lg font-semibold mb-5 text-slate-300">Valid BLS by Department</h2>
   <div id="deptChartBars"></div>
@@ -134,133 +133,14 @@
 </div>
 
 <script>
-const GOOGLE_API_KEY = 'AIzaSyCnLr1j8vdS6b8PKBOqV2I_Mmp9b4Yg9Ow';
+// 👇 PASTE YOUR APPS SCRIPT WEB APP URL HERE (after deploying bls-dashboard.gs)
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHMv5jAsueP8LQ9XKSkSo7ZKmazoPyYB1vRipOtubh086E7DQJeHERcZIQMEj0Sd5tkg/exec';
 
-const SHEET_CONFIGS = [
-  {
-    sheetId: "1P3cJ_v4nOETcYKlVgZMnAFEs-PKnnWyhHBJ__nThj48",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Nephrology",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6
-  },
-  {
-    sheetId: "1oP9SiAHGuJpcWaSB5NjlzY56K3D4nCNZ4hdMl_kLwLw",
-    tabName: "PAKAR ,MO",
-    department: "Cardiology",
-    nameCol: 2, designationCol: 5, expiryCol: 9, startRow: 2
-  },
-  {
-    sheetId: "1La2QBMhEr2w4Qwo7DkBW1AiylmLJQn7BdIisT-TzNZc",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Cardiothoracic Anaesthesia",
-    range: "B7:J80",
-    nameCol: 1, designationCol: 3, expiryCol: 7, startRow: 0
-  },
-  {
-    sheetId: "1aEk6QbghRafXg-arqt4jcTCk0pcvedmeszQjzxYpUSA",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Anaesthesia",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1z-aTRixj_tV4FuDl6P9JclyC1sj3wObbMXoXYYLZ_Gk",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Cardiothoracic",
-    nameCol: 2, designationCol: 4, expiryCol: 7, expiryOffsetYears: 2, startRow: 2
-  },
-  {
-    sheetId: "1KhMoCpCcjXKkFlOMiGHatZycyjFb_E0gZ1HnMwyK8co",
-    tabName: "2025 - DATA RESUSITASI EP/MO",
-    department: "Emergency",
-    nameCol: 1, designationCol: 3, expiryCol: 7, startRow: 0
-  },
-  {
-    sheetId: "19g_mOSLclVYeUTclcvlMZVzH-pB3fABBPeKMIBlaX24",
-    tabName: "DATABASE RESUSITASI JABATAN GIM",
-    department: "Medical",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "149n4-ryIM_nJd3GU6MKqrSMqio8o_6GAW0fQBKVV8bw",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Obstetric & Gynaecology",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1EnEN-pNK1T-_C_6M1sJzUk8AS7YJq6tcCkkYD7PJvvg",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Ophthalmology",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1WVAXzfpoqvrd5OgazBDEeU4MmtCGbqBLLWfkRwI5ZOs",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Oral & Maxillofacial Surgery",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1uO-jiTB2KLGJQu8LeU_C5GSq9lyk1a8TMbQN3wqoIZg",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Otorhinolaryngology",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1kih53UJOWcQ8jLZND8nEp5amYfwfEX5-nSjdUSXNcK8",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Orthopaedic",
-    nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, expiryOffsetYears: 2, startRow: 2
-  },
-  {
-    sheetId: "1QRKY4R1IOPH7iQO9ENdEwg1ykeGKOIDoXZJBnjjacOA",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Paediatric Dentistry",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1q6UdhaSjW9qWvCgztbdzNsYB-iJoa5KaHiO53eAK5Cc",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Paediatrics",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2,
-    skipNames: ["PAKAR", "MO KKM", "MO MASTERS"]
-  },
-  {
-    sheetId: "1DbrF6VWX1smnNTht54aAge-lO6iDALI1bb7oVtwIP90",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Pathology",
-    nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 2
-  },
-  {
-    sheetId: "1cZy4K2f0V3k5kDkakJ0f52O_AnSnOcED79x850f8OKI",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Psychiatry",
-    nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, fallbackExpiryOffsetYears: 2, startRow: 2,
-    skipDesignations: ["PPP"]
-  },
-  {
-    sheetId: "1HL0pEb1ePzJXhKlj4exSfRjPefsfWJnWByUbfm6iQSs",
-    tabName: "DATABASE RESUSITASI JABATAN",
-    department: "Pulmonology",
-    nameCol: 2, designationCol: 4, expiryCol: 8, fallbackExpiryCol: 7, fallbackExpiryOffsetYears: 2, startRow: 2,
-    dateFormat: 'DMY'
-  },
-  { sheetId: "154ZSRXZCy0soXLl7lElvMKY-FS-l3YxHNpJ3Pwp0tGM", tabName: "DATABASE RESUSITASI JABATAN", department: "Radiology", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6, keepDesignations: ["PAKAR", "PEGAWAI PERUBATAN"] },
-  { sheetId: "1x_HEdwPPdEQY09pIt948kjKpa2FIHQtOn4mLYYZO2QM", tabName: "DATABASE RESUSITASI JABATAN", department: "Rehabilitation Medicine", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 },
-  { sheetId: "1EKrw10hQ_tyURhTvA4iFEoft9c3WmSBdAQQyFWjUQ7w", tabName: "DATABASE RESUSITASI JABATAN", department: "Surgical", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 },
-  { sheetId: "1WHsW1pJzDOlxgnj1Agc7XSzts606YYh5aOC56NYH4E4", tabName: "DATABASE RESUSITASI JABATAN", department: "Transfusion", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 },
-  { sheetId: "1xMa2gbHHf-5ujGN1by20e9Tp8-aOsoHjS5lRlzS41Fc", tabName: "DATABASE RESUSITASI JABATAN", department: "Urology", nameCol: 2, designationCol: 4, expiryCol: 8, startRow: 6 }
-];
-
-const invalidRows = [
-  "VALID","EXPIRED","JUMLAH","TOTAL","%","BELUM",
-  "ALS","ACLS","NRP","PPS","BLS VALID","EXPIRED BLS",
-  "BELUM AMBIL BLS","TOTAL STAF","< 6/12:",
-  "% BLS VALID","ALS/ACLS VALID","EXPIRED ALS/ACLS",
-  "BELUM AMBIL ALS/ACLS","% ALS/ACLS VALID",
-  "PPP U5","PALS VALID","EXPIRED PALS","BELUM AMBIL PALS",
-  "DR","MR","MS","MISS","DATO","DATUK",
-  "NAME","DESIGNATION","EXPIRY DATE BLS","NO","NAMA",
-  "OLSS VALID","EXPIRED OLSS","BELUM AMBIL OLSS","% OLSS VALID",
-  "<6/12","PERUNDING PERUBATAN O&G","PAKAR PERUNDING PERUBATAN O&G"
+const DEPARTMENTS = [
+  "Nephrology","Cardiology","Cardiothoracic Anaesthesia","Anaesthesia","Cardiothoracic",
+  "Emergency","Medical","Obstetric & Gynaecology","Ophthalmology","Oral & Maxillofacial Surgery",
+  "Otorhinolaryngology","Orthopaedic","Paediatric Dentistry","Paediatrics","Pathology",
+  "Psychiatry","Pulmonology","Radiology","Rehabilitation Medicine","Surgical","Transfusion","Urology"
 ];
 
 let allData = [];
@@ -283,67 +163,7 @@ function setLoading(on) {
   if (btn)     btn.disabled = on;
 }
 
-async function fetchSheet(config) {
-  try {
-    const rangeStr = config.range
-      ? `${config.tabName}!${config.range}`
-      : config.tabName;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}`
-      + `?includeGridData=true`
-      + `&ranges=${encodeURIComponent(rangeStr)}`
-      + `&key=${GOOGLE_API_KEY}`;
-
-    const res = await fetch(url);
-    if (!res.ok) { console.error(`Sheets API ${res.status} for ${config.department}`); return []; }
-
-    const json = await res.json();
-    const sheet = json.sheets?.[0];
-    if (!sheet) return [];
-
-    const merges   = sheet.merges || [];
-    const gridData = sheet.data?.[0];
-    if (!gridData) return [];
-
-    const rowData  = gridData.rowData  || [];
-    const startRow = gridData.startRow    || 0;
-    const startCol = gridData.startColumn || 0;
-
-    const grid = rowData.map(row =>
-      (row.values || []).map(cell => {
-        const ev = cell.effectiveValue;
-        let v = null;
-        if (ev) {
-          if (ev.stringValue  !== undefined) v = ev.stringValue;
-          else if (ev.numberValue !== undefined) v = ev.numberValue;
-          else if (ev.boolValue   !== undefined) v = ev.boolValue;
-        }
-        return { v, f: cell.formattedValue ?? null };
-      })
-    );
-
-    merges.forEach(merge => {
-      const rStart = merge.startRowIndex    - startRow;
-      const rEnd   = merge.endRowIndex      - startRow;
-      const cStart = merge.startColumnIndex - startCol;
-      const cEnd   = merge.endColumnIndex   - startCol;
-      if (rStart < 0 || cStart < 0) return;
-      const topLeft = grid[rStart]?.[cStart];
-      if (!topLeft) return;
-      for (let r = rStart; r < rEnd; r++) {
-        for (let c = cStart; c < cEnd; c++) {
-          if (r === rStart && c === cStart) continue;
-          if (grid[r]?.[c] !== undefined) grid[r][c] = { ...topLeft };
-        }
-      }
-    });
-
-    const rows = grid.map(cells => ({ c: cells }));
-    return parseDepartment(rows, config);
-  } catch (e) {
-    console.error(`Fetch failed for ${config.department}:`, e);
-    return [];
-  }
-}
+// =================== Status calculation (client-side, uses today's date) ===================
 
 function extractYear(str) {
   const m = String(str).match(/\b(20\d{2}|19\d{2})\b/);
@@ -353,123 +173,23 @@ function extractYear(str) {
   return NaN;
 }
 
-function parseDepartment(rows, config) {
-  const data = [];
-  const seenNames = new Set();
-  for (let i = config.startRow; i < rows.length; i++) {
-    const row = rows[i]?.c || [];
-
-    const name = String(row[config.nameCol]?.v ?? row[config.nameCol]?.f ?? '').trim();
-    if (!name || name === 'undefined' || name === 'null') continue;
-    if (/DIKEMASKINI/i.test(name)) break;
-    if (/^[-–—*#.]+$/.test(name)) continue;
-    if (config.skipNames && config.skipNames.some(n => name.toUpperCase() === n.toUpperCase())) continue;
-    if (config.skipDesignations) {
-      const desig = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim().toUpperCase();
-      if (config.skipDesignations.some(d => desig.includes(d.toUpperCase()))) continue;
-    }
-    if (config.keepDesignations) {
-      const desig = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim().toUpperCase();
-      if (!config.keepDesignations.some(d => desig.includes(d.toUpperCase()))) continue;
-    }
-
-    const designation = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim();
-
-    const getExpiry = (col) => String(row[col]?.f ?? row[col]?.v ?? '').trim();
-    let expiry = getExpiry(config.expiryCol);
-    let usedFallback = false;
-    if (!expiry && config.fallbackExpiryCol !== undefined) {
-      expiry = getExpiry(config.fallbackExpiryCol);
-      usedFallback = true;
-    }
-    if (config.expiryOffsetYears && expiry && !usedFallback) {
-      const yr = extractYear(expiry);
-      if (!isNaN(yr)) expiry = String(yr + config.expiryOffsetYears);
-    }
-    if (usedFallback && config.fallbackExpiryOffsetYears && expiry) {
-      const yr = extractYear(expiry);
-      if (!isNaN(yr)) expiry = String(yr + config.fallbackExpiryOffsetYears);
-    }
-    if (config.statusCol !== undefined) {
-      const statusVal = String(row[config.statusCol]?.v ?? row[config.statusCol]?.f ?? '').trim().toUpperCase();
-      if (statusVal === 'VALID') {
-        const computesExpired = (() => {
-          if (!expiry) return true;
-          const p = parseExpiryDate(expiry);
-          if (p) return new Date(p.year, p.month - 1, p.day) < new Date();
-          const yr = parseInt(expiry, 10);
-          return !isNaN(yr) && yr < new Date().getFullYear();
-        })();
-        if (computesExpired) expiry = '2099';
-      }
-    }
-
-    const normalizedName = name.replace(/\s+/g, ' ').replace(/['']/g, "'").trim();
-    const upper = normalizedName.toUpperCase();
-
-    if (
-      invalidRows.includes(upper) ||
-      upper.startsWith('PEGAWAI') ||
-      upper.includes('DIKEMASKINI') ||
-      upper.includes('NEPHROLOGIST') ||
-      /^\d+$/.test(upper)
-    ) continue;
-
-    if (config.department === 'Cardiothoracic Anaesthesia') {
-      const nu = upper.replace(/[.`'''\s]+/g, ' ').trim();
-      const hasDoctorTitle = ['DR', 'DATO', 'MR', 'MISS', 'MS'].some(k => nu.startsWith(k));
-      const isNonDoctor = ['PPP','PENYELIA PPP','JURURAWAT','STAFF NURSE','MA','PEMBANTU','ASSISTANT','U5','U6','U7','U8','U9']
-        .some(k => designation.toUpperCase().includes(k));
-      if (!hasDoctorTitle || isNonDoctor) continue;
-    }
-
-    if (!config.skipDedup) {
-      const dedupKey = upper
-        .replace(/\bBINTI\b|\bBIN\b|\bA\/P\b|\bA\/L\b|\bBINTE\b/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (seenNames.has(dedupKey)) continue;
-      seenNames.add(dedupKey);
-    }
-    data.push({ NAME: normalizedName, DEPARTMENT: config.department, DESIGNATION: designation, EXPIRY: expiry });
-  }
-  return data;
-}
-
 function parseExpiryDate(value) {
-  const v = value.trim().toUpperCase();
-
-  const gviz = v.match(/^DATE\((\d{4}),(\d{1,2}),(\d{1,2})\)$/);
-  if (gviz) return { year: +gviz[1], month: +gviz[2] + 1, day: +gviz[3] };
-
-  const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (iso) return { year: +iso[1], month: +iso[2], day: +iso[3] };
-
-  const ymd = v.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if (ymd) return { year: +ymd[1], month: +ymd[2], day: +ymd[3] };
-
-  const dmy4 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dmy4) {
-    const a = +dmy4[1], b = +dmy4[2], y = +dmy4[3];
+  const v = String(value).trim().toUpperCase();
+  let m;
+  if ((m = v.match(/^DATE\((\d{4}),(\d{1,2}),(\d{1,2})\)$/))) return { year: +m[1], month: +m[2] + 1, day: +m[3] };
+  if ((m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/)))             return { year: +m[1], month: +m[2], day: +m[3] };
+  if ((m = v.match(/^(\d{4})\/(\d{2})\/(\d{2})$/)))           return { year: +m[1], month: +m[2], day: +m[3] };
+  if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) {
+    const a = +m[1], b = +m[2], y = +m[3];
     if (b > 12) return { year: y, month: a, day: b };
     return { year: y, month: b, day: a };
   }
-
-  const dmy4d = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (dmy4d) return { year: +dmy4d[3], month: +dmy4d[2], day: +dmy4d[1] };
-
-  const dmy4dot = v.match(/^(\d{1,2})\.(\d{1,2})\.(20\d{2}|19\d{2})$/);
-  if (dmy4dot) return { year: +dmy4dot[3], month: +dmy4dot[2], day: +dmy4dot[1] };
-
-  const dmy2 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-  if (dmy2) return { year: 2000 + +dmy2[3], month: +dmy2[2], day: +dmy2[1] };
-
-  const my = v.match(/^(\d{1,2})\/(20\d{2}|19\d{2})$/);
-  if (my) return { year: +my[2], month: +my[1], day: 1 };
-
+  if ((m = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)))             return { year: +m[3], month: +m[2], day: +m[1] };
+  if ((m = v.match(/^(\d{1,2})\.(\d{1,2})\.(20\d{2}|19\d{2})$/))) return { year: +m[3], month: +m[2], day: +m[1] };
+  if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)))           return { year: 2000 + +m[3], month: +m[2], day: +m[1] };
+  if ((m = v.match(/^(\d{1,2})\/(20\d{2}|19\d{2})$/)))            return { year: +m[2], month: +m[1], day: 1 };
   const yr = extractYear(v);
   if (!isNaN(yr)) return { year: yr, month: 1, day: 1 };
-
   return null;
 }
 
@@ -477,8 +197,8 @@ function getStatus(expiry) {
   const value = String(expiry || '').trim().toUpperCase();
   if (!value || value === '-' || value === 'N/A' || value === 'EXPIRED' || value.includes('NO BLS')) return 'EXPIRED';
 
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
+  const now = new Date();
+  const currentYear = now.getFullYear();
 
   const plainYr = parseInt(value, 10);
   if (!isNaN(plainYr) && String(plainYr) === value.trim()) {
@@ -490,21 +210,20 @@ function getStatus(expiry) {
   const parsed = parseExpiryDate(value);
   if (parsed) {
     const expiryDate = new Date(parsed.year, parsed.month - 1, parsed.day);
-    if (expiryDate < currentDate) return 'EXPIRED';
+    if (expiryDate < now) return 'EXPIRED';
     if (parsed.year === currentYear) return 'EXPIRING SOON';
     return 'VALID';
   }
-
   return 'VALID';
 }
 
+// =================== Single-fetch data loading ===================
+
 const CACHE_KEY = 'bls_dashboard_cache';
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 function saveCache(data) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-  } catch (e) {}
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch (e) {}
 }
 
 function loadCache() {
@@ -517,35 +236,8 @@ function loadCache() {
   } catch (e) { return null; }
 }
 
-async function fetchSheetWithRetry(config) {
-  const rows = await fetchSheet(config);
-  if (rows.length > 0) return rows;
-  await new Promise(r => setTimeout(r, 800));
-  return fetchSheet(config);
-}
-
-async function fetchInBatches(configs, batchSize = 5, delayMs = 400) {
-  const allRows = new Array(configs.length);
-  for (let i = 0; i < configs.length; i += batchSize) {
-    const batch = configs.slice(i, i + batchSize);
-    const results = await Promise.allSettled(batch.map(c => fetchSheetWithRetry(c)));
-    results.forEach((r, j) => {
-      const idx = i + j;
-      if (r.status === 'fulfilled') {
-        allRows[idx] = r.value;
-      } else {
-        console.error(`Failed to load ${configs[idx].department}:`, r.reason);
-        allRows[idx] = [];
-      }
-    });
-    if (i + batchSize < configs.length) {
-      await new Promise(r => setTimeout(r, delayMs));
-    }
-  }
-  return allRows.flat();
-}
-
 async function loadData(forceRefresh = false) {
+  // Show cached data immediately for instant feedback
   if (!forceRefresh) {
     const cached = loadCache();
     if (cached) {
@@ -558,15 +250,29 @@ async function loadData(forceRefresh = false) {
 
   setLoading(true);
 
-  const freshData = await fetchInBatches(SHEET_CONFIGS);
+  try {
+    const url = forceRefresh ? `${APPS_SCRIPT_URL}?fresh=1` : APPS_SCRIPT_URL;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const fresh = Array.isArray(json) ? json : json.data;
 
-  const cached = loadCache();
-  if (!cached || freshData.length >= cached.length * 0.95) {
-    allData = freshData;
-    saveCache(allData);
-  } else {
-    console.warn(`Fetch returned fewer records than cache (${freshData.length} vs ${cached.length}), keeping cache`);
-    allData = cached;
+    if (!Array.isArray(fresh)) throw new Error('Bad payload');
+
+    // Guard against partial responses overwriting good cached data
+    const cached = loadCache();
+    if (!cached || fresh.length >= cached.length * 0.95) {
+      allData = fresh;
+      saveCache(allData);
+    } else {
+      console.warn(`Fetch returned fewer records than cache (${fresh.length} vs ${cached.length}), keeping cache`);
+      allData = cached;
+    }
+  } catch (e) {
+    console.error('Load failed:', e);
+    if (allData.length === 0) {
+      safeSetText('lastUpdated', 'Failed to load — check Apps Script URL');
+    }
   }
 
   populateDepartmentDropdown();
@@ -575,11 +281,13 @@ async function loadData(forceRefresh = false) {
   setLoading(false);
 }
 
+// =================== Rendering ===================
+
 function populateDepartmentDropdown() {
   const select = document.getElementById('departmentFilter');
   if (!select) return;
   select.innerHTML = '<option value="ALL">All Departments</option>';
-  SHEET_CONFIGS.map(c => c.department).forEach(dep => {
+  DEPARTMENTS.forEach(dep => {
     select.innerHTML += `<option value="${dep}"${dep === currentDepartment ? ' selected' : ''}>${dep}</option>`;
   });
 }
@@ -699,12 +407,8 @@ function setDonutDeptText(name) {
   let line = '';
   for (const word of words) {
     const test = line ? `${line} ${word}` : word;
-    if (line && test.length > 12) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
+    if (line && test.length > 12) { lines.push(line); line = word; }
+    else { line = test; }
   }
   if (line) lines.push(line);
 
@@ -773,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await loadData(true);
   });
 
+  populateDepartmentDropdown();
   loadData();
 
   setInterval(async () => {
