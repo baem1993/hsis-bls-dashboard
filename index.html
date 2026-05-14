@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -294,7 +293,7 @@ async function fetchSheet(config) {
       + `&ranges=${encodeURIComponent(rangeStr)}`
       + `&key=${GOOGLE_API_KEY}`;
 
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url);
     if (!res.ok) { console.error(`Sheets API ${res.status} for ${config.department}`); return []; }
 
     const json = await res.json();
@@ -347,7 +346,6 @@ async function fetchSheet(config) {
 }
 
 function extractYear(str) {
-  // Match a 4-digit year (e.g. "15/5/2023" → 2023, "2023" → 2023, "Date(2023,4,14)" → 2023)
   const m = String(str).match(/\b(20\d{2}|19\d{2})\b/);
   if (m) return parseInt(m[1], 10);
   const d = String(str).match(/Date\((\d{4})/);
@@ -363,18 +361,13 @@ function parseDepartment(rows, config) {
 
     const name = String(row[config.nameCol]?.v ?? row[config.nameCol]?.f ?? '').trim();
     if (!name || name === 'undefined' || name === 'null') continue;
-    // Stop parsing when we hit footer markers
     if (/DIKEMASKINI/i.test(name)) break;
-    // Skip dash-only or punctuation-only names
     if (/^[-–—*#.]+$/.test(name)) continue;
-    // Skip section header rows defined per-config
     if (config.skipNames && config.skipNames.some(n => name.toUpperCase() === n.toUpperCase())) continue;
-    // Skip rows where designation matches a blocked label
     if (config.skipDesignations) {
       const desig = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim().toUpperCase();
       if (config.skipDesignations.some(d => desig.includes(d.toUpperCase()))) continue;
     }
-    // Keep only rows whose designation contains one of the allowed strings
     if (config.keepDesignations) {
       const desig = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim().toUpperCase();
       if (!config.keepDesignations.some(d => desig.includes(d.toUpperCase()))) continue;
@@ -382,27 +375,21 @@ function parseDepartment(rows, config) {
 
     const designation = String(row[config.designationCol]?.v ?? row[config.designationCol]?.f ?? '').trim();
 
-    // Always prefer formattedValue (.f) for expiry — v4 API returns serial numbers in .v for date cells
     const getExpiry = (col) => String(row[col]?.f ?? row[col]?.v ?? '').trim();
     let expiry = getExpiry(config.expiryCol);
-    // If primary expiry col is empty and a fallback col is configured, use it
     let usedFallback = false;
     if (!expiry && config.fallbackExpiryCol !== undefined) {
       expiry = getExpiry(config.fallbackExpiryCol);
       usedFallback = true;
     }
-    // Apply year offset: global offset applies to primary col; fallbackExpiryOffsetYears applies only when fallback was used
     if (config.expiryOffsetYears && expiry && !usedFallback) {
       const yr = extractYear(expiry);
       if (!isNaN(yr)) expiry = String(yr + config.expiryOffsetYears);
     }
     if (usedFallback && config.fallbackExpiryOffsetYears && expiry) {
       const yr = extractYear(expiry);
-      if (!isNaN(yr)) expiry = String(yr + config.fallbackExpiryOffsetYears); // result is year format e.g. "2025"
+      if (!isNaN(yr)) expiry = String(yr + config.fallbackExpiryOffsetYears);
     }
-    // statusCol: use the sheet's own validity column as authoritative override.
-    // Applies when expiry is empty AND when our computed expiry would be EXPIRED
-    // but the sheet explicitly says "VALID" (e.g. training year stored instead of expiry year).
     if (config.statusCol !== undefined) {
       const statusVal = String(row[config.statusCol]?.v ?? row[config.statusCol]?.f ?? '').trim().toUpperCase();
       if (statusVal === 'VALID') {
@@ -413,9 +400,8 @@ function parseDepartment(rows, config) {
           const yr = parseInt(expiry, 10);
           return !isNaN(yr) && yr < new Date().getFullYear();
         })();
-        if (computesExpired) expiry = '2099'; // far-future → VALID badge
+        if (computesExpired) expiry = '2099';
       }
-      // If statusVal is EXPIRED / <6/12 / empty, leave expiry as computed
     }
 
     const normalizedName = name.replace(/\s+/g, ' ').replace(/['']/g, "'").trim();
@@ -451,46 +437,36 @@ function parseDepartment(rows, config) {
 }
 
 function parseExpiryDate(value) {
-  // Returns { year, month (1-based), day } or null
   const v = value.trim().toUpperCase();
 
-  // gviz: Date(YYYY,M,D) — month is 0-indexed
   const gviz = v.match(/^DATE\((\d{4}),(\d{1,2}),(\d{1,2})\)$/);
   if (gviz) return { year: +gviz[1], month: +gviz[2] + 1, day: +gviz[3] };
 
-  // ISO: YYYY-MM-DD
   const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return { year: +iso[1], month: +iso[2], day: +iso[3] };
 
-  // YYYY/MM/DD
   const ymd = v.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
   if (ymd) return { year: +ymd[1], month: +ymd[2], day: +ymd[3] };
 
-  // D/M/YYYY or DD/MM/YYYY — if second number > 12 it must be M/D/YYYY (US format)
   const dmy4 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmy4) {
     const a = +dmy4[1], b = +dmy4[2], y = +dmy4[3];
-    if (b > 12) return { year: y, month: a, day: b };   // M/D/YYYY
-    return { year: y, month: b, day: a };                // D/M/YYYY
+    if (b > 12) return { year: y, month: a, day: b };
+    return { year: y, month: b, day: a };
   }
 
-  // D-M-YYYY or DD-MM-YYYY
   const dmy4d = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (dmy4d) return { year: +dmy4d[3], month: +dmy4d[2], day: +dmy4d[1] };
 
-  // D.M.YYYY or DD.MM.YYYY (dot-separated)
   const dmy4dot = v.match(/^(\d{1,2})\.(\d{1,2})\.(20\d{2}|19\d{2})$/);
   if (dmy4dot) return { year: +dmy4dot[3], month: +dmy4dot[2], day: +dmy4dot[1] };
 
-  // D/M/YY or DD/MM/YY (2-digit year → assume 2000s)
   const dmy2 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if (dmy2) return { year: 2000 + +dmy2[3], month: +dmy2[2], day: +dmy2[1] };
 
-  // M/YYYY or MM/YYYY (month + year only)
   const my = v.match(/^(\d{1,2})\/(20\d{2}|19\d{2})$/);
   if (my) return { year: +my[2], month: +my[1], day: 1 };
 
-  // Any string containing a 4-digit year
   const yr = extractYear(v);
   if (!isNaN(yr)) return { year: yr, month: 1, day: 1 };
 
@@ -504,7 +480,6 @@ function getStatus(expiry) {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
 
-  // Plain year only (e.g. "2026") — no specific date, use year-level logic
   const plainYr = parseInt(value, 10);
   if (!isNaN(plainYr) && String(plainYr) === value.trim()) {
     if (plainYr < currentYear) return 'EXPIRED';
@@ -512,7 +487,6 @@ function getStatus(expiry) {
     return 'VALID';
   }
 
-  // Specific date — follow the actual date
   const parsed = parseExpiryDate(value);
   if (parsed) {
     const expiryDate = new Date(parsed.year, parsed.month - 1, parsed.day);
@@ -524,18 +498,77 @@ function getStatus(expiry) {
   return 'VALID';
 }
 
-async function loadData() {
-  setLoading(true);
-  allData = [];
-  for (const config of SHEET_CONFIGS) {
-    try {
-      const rows = await fetchSheet(config);
-      allData.push(...rows);
-    } catch (e) {
-      console.error(`Failed to load ${config.department}:`, e);
+const CACHE_KEY = 'bls_dashboard_cache';
+const CACHE_TTL = 10 * 60 * 1000;
+
+function saveCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch (e) {}
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
+async function fetchSheetWithRetry(config) {
+  const rows = await fetchSheet(config);
+  if (rows.length > 0) return rows;
+  await new Promise(r => setTimeout(r, 800));
+  return fetchSheet(config);
+}
+
+async function fetchInBatches(configs, batchSize = 5, delayMs = 400) {
+  const allRows = new Array(configs.length);
+  for (let i = 0; i < configs.length; i += batchSize) {
+    const batch = configs.slice(i, i + batchSize);
+    const results = await Promise.allSettled(batch.map(c => fetchSheetWithRetry(c)));
+    results.forEach((r, j) => {
+      const idx = i + j;
+      if (r.status === 'fulfilled') {
+        allRows[idx] = r.value;
+      } else {
+        console.error(`Failed to load ${configs[idx].department}:`, r.reason);
+        allRows[idx] = [];
+      }
+    });
+    if (i + batchSize < configs.length) {
+      await new Promise(r => setTimeout(r, delayMs));
     }
-    await new Promise(r => setTimeout(r, 300));
   }
+  return allRows.flat();
+}
+
+async function loadData(forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = loadCache();
+    if (cached) {
+      allData = cached;
+      populateDepartmentDropdown();
+      processDashboard();
+      safeSetText('lastUpdated', 'Cached — refreshing…');
+    }
+  }
+
+  setLoading(true);
+
+  const freshData = await fetchInBatches(SHEET_CONFIGS);
+
+  const cached = loadCache();
+  if (!cached || freshData.length >= cached.length * 0.95) {
+    allData = freshData;
+    saveCache(allData);
+  } else {
+    console.warn(`Fetch returned fewer records than cache (${freshData.length} vs ${cached.length}), keeping cache`);
+    allData = cached;
+  }
+
   populateDepartmentDropdown();
   processDashboard();
   safeSetText('lastUpdated', new Date().toLocaleString());
@@ -546,7 +579,6 @@ function populateDepartmentDropdown() {
   const select = document.getElementById('departmentFilter');
   if (!select) return;
   select.innerHTML = '<option value="ALL">All Departments</option>';
-  // Always show all configured departments, even if no data loaded yet
   SHEET_CONFIGS.map(c => c.department).forEach(dep => {
     select.innerHTML += `<option value="${dep}"${dep === currentDepartment ? ' selected' : ''}>${dep}</option>`;
   });
@@ -609,9 +641,7 @@ function updateDeptChart() {
     const total = deptData.length;
     const valid = deptData.filter(x => ['VALID','EXPIRING SOON'].includes(getStatus(x.EXPIRY))).length;
     const pct   = total ? ((valid / total) * 100).toFixed(1) : 0;
-
     const barColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#f87171';
-
     return `
       <div class="mb-5">
         <div class="flex justify-between items-center mb-2">
@@ -630,23 +660,27 @@ function updateDeptChart() {
 function populateTable() {
   const tbody = document.getElementById('tableBody');
   if (!tbody) return;
-  tbody.innerHTML = '';
-  filteredData.filter(item => item.NAME && item.NAME.trim()).forEach((item, index) => {
+  const fragment = document.createDocumentFragment();
+  let index = 0;
+  for (const item of filteredData) {
+    if (!item.NAME || !item.NAME.trim()) continue;
     const status = getStatus(item.EXPIRY);
-    let bg = 'transparent';
-    if (status === 'EXPIRED')      bg = 'rgba(127,29,29,0.9)';
-    if (status === 'EXPIRING SOON') bg = 'rgba(113,63,18,0.8)';
-    tbody.innerHTML += `
-      <tr style="background-color:${bg}">
-        <td class="py-3 text-cyan-400 font-semibold">${index + 1}</td>
-        <td>${item.NAME}</td>
-        <td>${item.DEPARTMENT}</td>
-        <td>${item.DESIGNATION}</td>
-        <td>${item.EXPIRY}</td>
-        <td>${status}</td>
-      </tr>
+    const bg = status === 'EXPIRED' ? 'rgba(127,29,29,0.9)'
+             : status === 'EXPIRING SOON' ? 'rgba(113,63,18,0.8)'
+             : 'transparent';
+    const tr = document.createElement('tr');
+    tr.style.backgroundColor = bg;
+    tr.innerHTML = `
+      <td class="py-3 text-cyan-400 font-semibold">${++index}</td>
+      <td>${item.NAME}</td>
+      <td>${item.DEPARTMENT}</td>
+      <td>${item.DESIGNATION}</td>
+      <td>${item.EXPIRY}</td>
+      <td>${status}</td>
     `;
-  });
+    fragment.appendChild(tr);
+  }
+  tbody.replaceChildren(fragment);
 }
 
 function setDonutDeptText(name) {
@@ -655,14 +689,12 @@ function setDonutDeptText(name) {
   while (el.firstChild) el.removeChild(el.firstChild);
 
   const words = name.split(' ');
-
   if (words.length === 1 || name.length <= 15) {
     el.setAttribute('y', '127');
     el.textContent = name;
     return;
   }
 
-  // Build lines capped at ~12 chars each
   const lines = [];
   let line = '';
   for (const word of words) {
@@ -676,7 +708,6 @@ function setDonutDeptText(name) {
   }
   if (line) lines.push(line);
 
-  // Adjust vertical start so lines stay inside the inner circle
   const lineH = 11;
   const startY = { 2: 122, 3: 124 }[lines.length] ?? 120;
   el.setAttribute('y', String(startY));
@@ -739,14 +770,14 @@ document.addEventListener('DOMContentLoaded', () => {
     processDashboard();
   });
   document.getElementById('refreshButton')?.addEventListener('click', async () => {
-    await loadData();
+    await loadData(true);
   });
 
   loadData();
 
   setInterval(async () => {
     try { await loadData(); } catch (e) { console.error('Auto refresh failed:', e); }
-  }, 60000);
+  }, 10 * 60 * 1000);
 });
 </script>
 
