@@ -430,9 +430,48 @@ function escapeHtml(s) {
 }
 
 async function loadMonitor(force) {
-  const content = document.getElementById('monitorContent');
+  const content    = document.getElementById('monitorContent');
+  const refreshBtn = document.getElementById('monitorRefreshBtn');
+  const forceBtn   = document.getElementById('monitorForceBtn');
+  const markBtn    = document.getElementById('monitorMarkSeenBtn');
+  const undoBtn    = document.getElementById('monitorUndoBtn');
   if (!content) return;
-  content.innerHTML = `<p class="text-slate-400">${force ? 'Forcing re-aggregation (~30s)…' : 'Loading…'}</p>`;
+
+  // Disable action buttons while loading
+  [refreshBtn, forceBtn, markBtn, undoBtn].forEach(b => { if (b) b.disabled = true; });
+
+  if (force) {
+    content.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-12 gap-4">
+        <svg class="animate-spin w-12 h-12 text-cyan-400" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+        <div class="text-center">
+          <div class="text-cyan-300 font-semibold">Forcing re-aggregation…</div>
+          <div class="text-slate-400 text-xs mt-1">Fetching all 22 source sheets and rewriting the master sheet. This usually takes 20–40 seconds — please don't close this window.</div>
+        </div>
+        <div class="w-full max-w-md bg-slate-800 rounded-full h-2 overflow-hidden">
+          <div id="forceProgressBar" class="h-2 bg-cyan-400 transition-all duration-1000" style="width:0%"></div>
+        </div>
+      </div>
+    `;
+    // Animate progress bar from 0 → 95% over ~30s (final 5% jumps when fetch returns)
+    const bar = document.getElementById('forceProgressBar');
+    if (bar) {
+      let pct = 0;
+      const tick = () => {
+        if (!document.body.contains(bar)) return; // bailed out
+        pct = Math.min(95, pct + 3);
+        bar.style.width = pct + '%';
+        if (pct < 95) setTimeout(tick, 1000);
+      };
+      setTimeout(tick, 100);
+    }
+  } else {
+    content.innerHTML = `<p class="text-slate-400">Loading…</p>`;
+  }
+
   try {
     const url = force ? `${APPS_SCRIPT_URL}?fresh=1` : APPS_SCRIPT_URL;
     const [statusRes, history] = await Promise.all([fetch(url), fetchHistory()]);
@@ -566,6 +605,8 @@ async function loadMonitor(force) {
     }
   } catch (e) {
     content.innerHTML = `<p class="text-red-300">Failed to load: ${escapeHtml(e.message)}</p>`;
+  } finally {
+    [refreshBtn, forceBtn, markBtn, undoBtn].forEach(b => { if (b) b.disabled = false; });
   }
 }
 
