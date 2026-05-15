@@ -109,6 +109,76 @@
   <div id="deptChartBars"></div>
 </div>
 
+<!-- Submit BLS Request modal -->
+<div id="submitModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="glass rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-cyan-400">Submit BLS Certificate</h2>
+      <button id="submitCloseBtn" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <p class="text-slate-400 text-sm mb-4">Fill in your details below. Your submission will be reviewed by an admin before it appears on the dashboard.</p>
+    <form id="submitForm" class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Full Name <span class="text-red-400">*</span></label>
+        <input id="reqName" type="text" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white" placeholder="e.g. Ahmad Bin Ali"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Department <span class="text-red-400">*</span></label>
+        <select id="reqDept" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white">
+          <option value="">— Select department —</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Designation <span class="text-red-400">*</span></label>
+        <input id="reqDesig" type="text" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white" placeholder="e.g. Pegawai Perubatan"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">BLS Expiry Date <span class="text-red-400">*</span></label>
+        <input id="reqExpiry" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">BLS Certificate (image/PDF) <span class="text-red-400">*</span></label>
+        <input id="reqCert" type="file" required accept="image/*,application/pdf" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm"/>
+        <p class="text-xs text-slate-500 mt-1">Max 5 MB. JPG, PNG or PDF.</p>
+      </div>
+      <div id="submitStatus" class="hidden text-sm rounded-xl px-4 py-2"></div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="submitFormBtn" class="bg-cyan-500 hover:bg-cyan-400 px-5 py-2 rounded-xl font-semibold text-slate-900 flex-1">Submit for Review</button>
+        <button type="button" id="submitCancelBtn" class="bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-xl font-semibold text-white">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Pending requests modal -->
+<div id="pendingModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="glass rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-cyan-400">Pending BLS Requests</h2>
+      <div class="flex items-center gap-3">
+        <button id="pendingShowLogBtn" class="text-xs text-slate-400 hover:text-cyan-300 underline">View approval log</button>
+        <button id="pendingCloseBtn" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+    </div>
+    <div id="pendingContent" class="space-y-4 text-sm">
+      <p class="text-slate-400">Loading…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Approval log modal -->
+<div id="logModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="glass rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-cyan-400">Approval Log</h2>
+      <button id="logCloseBtn" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div id="logContent" class="space-y-3 text-sm">
+      <p class="text-slate-400">Loading…</p>
+    </div>
+  </div>
+</div>
+
 <!-- Admin monitor modal -->
 <div id="monitorModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
   <div class="glass rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
@@ -119,7 +189,14 @@
     <div id="monitorContent" class="space-y-4 text-sm">
       <p class="text-slate-400">Loading…</p>
     </div>
-    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="flex flex-col items-start gap-1">
+        <button id="monitorReviewBtn" class="bg-purple-500 hover:bg-purple-400 px-4 py-2 rounded-xl font-semibold text-white w-full sm:w-auto flex items-center gap-2">
+          Review name requests
+          <span id="monitorPendingBadge" class="hidden bg-yellow-400 text-slate-900 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+        </button>
+        <p class="text-xs text-slate-400">Opens pending BLS submissions from staff. Approve to add them to the master sheet + their department sheet, or reject. Replacements are logged.</p>
+      </div>
       <div class="flex flex-col items-start gap-1">
         <button id="monitorRefreshBtn" class="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-xl font-semibold text-slate-900 w-full sm:w-auto">Reload status</button>
         <p class="text-xs text-slate-400">Fetches the latest stats from the Apps Script (~500&nbsp;ms). Use this to refresh the numbers shown above without re-running the full aggregation.</p>
@@ -141,7 +218,12 @@
 
 <div class="glass rounded-2xl p-5 overflow-auto">
   <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
-    <h2 class="text-xl font-semibold">Staff Certification Records</h2>
+    <div class="flex items-center gap-3">
+      <h2 class="text-xl font-semibold">Staff Certification Records</h2>
+      <button id="submitRequestBtn" class="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-xl font-semibold text-slate-900 text-sm flex items-center gap-2">
+        <span class="text-base leading-none">+</span> Submit BLS Request
+      </button>
+    </div>
     <div class="flex flex-wrap gap-3">
       <select id="departmentFilter" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white">
         <option value="ALL">All Departments</option>
@@ -357,6 +439,101 @@ async function loadData(opts) {
   updateProtectionBadge();
 }
 
+// =================== Submit BLS Request (public) ===================
+
+function setupSubmitRequest() {
+  const openBtn   = document.getElementById('submitRequestBtn');
+  const closeBtn  = document.getElementById('submitCloseBtn');
+  const cancelBtn = document.getElementById('submitCancelBtn');
+  const modal     = document.getElementById('submitModal');
+  const form      = document.getElementById('submitForm');
+  const deptSel   = document.getElementById('reqDept');
+
+  // Populate dept dropdown
+  if (deptSel) {
+    DEPARTMENTS.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      deptSel.appendChild(opt);
+    });
+  }
+
+  const close = () => { modal?.classList.add('hidden'); };
+  openBtn?.addEventListener('click', () => {
+    form?.reset();
+    const status = document.getElementById('submitStatus');
+    if (status) { status.classList.add('hidden'); status.textContent = ''; }
+    modal?.classList.remove('hidden');
+  });
+  closeBtn?.addEventListener('click', close);
+  cancelBtn?.addEventListener('click', close);
+  modal?.addEventListener('click', e => { if (e.target === modal) close(); });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusEl  = document.getElementById('submitStatus');
+    const submitBtn = document.getElementById('submitFormBtn');
+    const setStatus = (msg, type) => {
+      if (!statusEl) return;
+      statusEl.className = `text-sm rounded-xl px-4 py-2 ${type === 'error' ? 'bg-red-500/10 text-red-300 border border-red-500/30' : type === 'ok' ? 'bg-green-500/10 text-green-300 border border-green-500/30' : 'bg-slate-700/50 text-slate-300'}`;
+      statusEl.textContent = msg;
+      statusEl.classList.remove('hidden');
+    };
+
+    const name    = document.getElementById('reqName').value.trim();
+    const dept    = document.getElementById('reqDept').value;
+    const desig   = document.getElementById('reqDesig').value.trim();
+    const expiry  = document.getElementById('reqExpiry').value;
+    const certEl  = document.getElementById('reqCert');
+    const file    = certEl?.files?.[0];
+
+    if (!name || !dept || !desig || !expiry || !file) {
+      setStatus('Please fill in all required fields.', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus('File is larger than 5 MB. Please upload a smaller file.', 'error');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    setStatus('Uploading… please wait.', 'info');
+
+    try {
+      const certBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const payload = {
+        action: 'submitRequest',
+        name, department: dept, designation: desig, expiry,
+        certName: file.name,
+        certMime: file.type || 'application/octet-stream',
+        certBase64
+      };
+
+      // text/plain avoids CORS preflight on Apps Script
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+
+      setStatus('✓ Submitted! An admin will review your request shortly.', 'ok');
+      setTimeout(() => { document.getElementById('submitModal')?.classList.add('hidden'); }, 1800);
+    } catch (err) {
+      setStatus(`Failed: ${err.message}. Please try again or contact admin.`, 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
 // =================== Admin Monitor (password-gated) ===================
 
 const MONITOR_PASSWORD = '199365';
@@ -407,6 +584,233 @@ function setupMonitor() {
     document.getElementById('monitorUndoBtn')?.classList.add('hidden');
     loadMonitor(false);
   });
+}
+
+// =================== Pending requests review (admin) ===================
+
+// Damerau-Levenshtein-ish similarity for fuzzy name matching.
+function nameSimilarity(a, b) {
+  const norm = s => String(s || '').toUpperCase().replace(/[^A-Z ]/g, '').replace(/\s+/g, ' ').trim();
+  const A = norm(a), B = norm(b);
+  if (!A || !B) return 0;
+  if (A === B) return 1;
+  // token-set Jaccard, weighted with prefix bonus
+  const ta = new Set(A.split(' ').filter(w => w.length > 1));
+  const tb = new Set(B.split(' ').filter(w => w.length > 1));
+  let inter = 0; ta.forEach(t => { if (tb.has(t)) inter++; });
+  const union = new Set([...ta, ...tb]).size || 1;
+  return inter / union;
+}
+
+function findSimilarNames(name, limit) {
+  const scored = allData.map(r => ({ rec: r, score: nameSimilarity(name, r.NAME) }))
+    .filter(x => x.score >= 0.5)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit || 3);
+  return scored;
+}
+
+async function fetchPendingRequests() {
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=pending`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.requests) ? data.requests : [];
+  } catch (e) { console.error(e); return []; }
+}
+
+async function fetchApprovalLog() {
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=log`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.entries) ? data.entries : [];
+  } catch (e) { console.error(e); return []; }
+}
+
+function setupPendingReview() {
+  const reviewBtn = document.getElementById('monitorReviewBtn');
+  const closeBtn  = document.getElementById('pendingCloseBtn');
+  const logBtn    = document.getElementById('pendingShowLogBtn');
+  const modal     = document.getElementById('pendingModal');
+  const logModal  = document.getElementById('logModal');
+  const logClose  = document.getElementById('logCloseBtn');
+
+  reviewBtn?.addEventListener('click', () => {
+    modal?.classList.remove('hidden');
+    loadPendingRequests();
+  });
+  closeBtn?.addEventListener('click', () => modal?.classList.add('hidden'));
+  modal?.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  logBtn?.addEventListener('click', () => {
+    logModal?.classList.remove('hidden');
+    loadApprovalLog();
+  });
+  logClose?.addEventListener('click', () => logModal?.classList.add('hidden'));
+  logModal?.addEventListener('click', e => { if (e.target === logModal) logModal.classList.add('hidden'); });
+}
+
+async function refreshPendingBadge() {
+  const badge = document.getElementById('monitorPendingBadge');
+  if (!badge) return;
+  const reqs = await fetchPendingRequests();
+  if (reqs.length > 0) {
+    badge.textContent = String(reqs.length);
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+async function loadPendingRequests() {
+  const content = document.getElementById('pendingContent');
+  if (!content) return;
+  content.innerHTML = `<p class="text-slate-400">Loading pending requests…</p>`;
+
+  const requests = await fetchPendingRequests();
+  if (requests.length === 0) {
+    content.innerHTML = `<div class="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-green-300 text-sm">✓ No pending requests. All submissions have been reviewed.</div>`;
+    return;
+  }
+
+  content.innerHTML = requests.map(req => {
+    const similar = findSimilarNames(req.name, 3);
+    const submittedAt = req.timestamp ? new Date(req.timestamp).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const exactMatch = similar.find(s => s.score === 1);
+    const fuzzyMatches = similar.filter(s => s.score < 1);
+
+    return `
+      <div class="glass rounded-xl p-4" data-req-id="${escapeHtml(req.id)}">
+        <div class="flex justify-between items-start gap-3 mb-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-lg font-semibold text-white">${escapeHtml(req.name)}</div>
+            <div class="text-xs text-slate-500">Submitted ${submittedAt}</div>
+          </div>
+          ${req.certUrl ? `<a href="${escapeHtml(req.certUrl)}" target="_blank" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg text-cyan-300 whitespace-nowrap">View cert ↗</a>` : ''}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-3">
+          <div><span class="text-slate-500">Department:</span> <span class="text-slate-200">${escapeHtml(req.department)}</span></div>
+          <div><span class="text-slate-500">Designation:</span> <span class="text-slate-200">${escapeHtml(req.designation)}</span></div>
+          <div><span class="text-slate-500">Expiry:</span> <span class="text-slate-200">${escapeHtml(req.expiry)}</span></div>
+        </div>
+
+        ${exactMatch ? `
+          <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3 text-xs">
+            <div class="text-yellow-200 font-semibold mb-1">⚠ Exact name match found in master</div>
+            <div class="text-yellow-200/80">${escapeHtml(exactMatch.rec.NAME)} — ${escapeHtml(exactMatch.rec.DEPARTMENT)} — ${escapeHtml(exactMatch.rec.DESIGNATION)} — expires ${escapeHtml(exactMatch.rec.EXPIRY)}</div>
+            <div class="text-yellow-200/60 mt-1">Approving will REPLACE this record.</div>
+          </div>
+        ` : fuzzyMatches.length > 0 ? `
+          <div class="bg-slate-700/40 border border-slate-600 rounded-lg p-3 mb-3 text-xs">
+            <div class="text-slate-300 font-semibold mb-1">Possible duplicates (${fuzzyMatches.length}):</div>
+            <div class="space-y-1">
+              ${fuzzyMatches.map(m => `
+                <label class="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" name="replace-${escapeHtml(req.id)}" value="${escapeHtml(m.rec.NAME)}" class="mt-1"/>
+                  <span class="text-slate-300">${escapeHtml(m.rec.NAME)} <span class="text-slate-500">— ${escapeHtml(m.rec.DEPARTMENT)} — ${escapeHtml(m.rec.DESIGNATION)} — expires ${escapeHtml(m.rec.EXPIRY)}</span> <span class="text-slate-500">(${Math.round(m.score * 100)}% match)</span></span>
+                </label>
+              `).join('')}
+              <label class="flex items-start gap-2 cursor-pointer pt-1 border-t border-slate-700">
+                <input type="radio" name="replace-${escapeHtml(req.id)}" value="" checked class="mt-1"/>
+                <span class="text-green-300">Add as new (no replacement)</span>
+              </label>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="flex flex-wrap gap-2">
+          <button class="approve-req-btn bg-green-500 hover:bg-green-400 px-4 py-2 rounded-lg font-semibold text-slate-900 text-sm" data-id="${escapeHtml(req.id)}" data-exact="${exactMatch ? escapeHtml(exactMatch.rec.NAME) : ''}">✓ Approve & add</button>
+          <button class="reject-req-btn bg-red-500 hover:bg-red-400 px-4 py-2 rounded-lg font-semibold text-white text-sm" data-id="${escapeHtml(req.id)}">✗ Reject</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Wire up approve buttons
+  content.querySelectorAll('.approve-req-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const exactReplace = btn.getAttribute('data-exact');
+      // Read selected radio if any
+      const radio = content.querySelector(`input[name="replace-${id}"]:checked`);
+      const replace = exactReplace || (radio ? radio.value : '');
+      const confirmMsg = replace
+        ? `Approve and REPLACE existing record for "${replace}"?\n\nThe old record will be archived in the approval log.`
+        : `Approve and add as a NEW record?`;
+      if (!confirm(confirmMsg)) return;
+      btn.disabled = true; btn.textContent = 'Approving…';
+      try {
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=approve&id=${encodeURIComponent(id)}&replace=${encodeURIComponent(replace)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+        // Approval writes to the source department tab only; trigger an
+        // immediate re-aggregation so the dashboard reflects it right away.
+        btn.textContent = 'Re-aggregating…';
+        await loadData({ skipCache: true, forceAggregation: true });
+        loadPendingRequests();
+        refreshPendingBadge();
+      } catch (e) {
+        alert(`Approval failed: ${e.message}`);
+        btn.disabled = false; btn.textContent = '✓ Approve & add';
+      }
+    });
+  });
+
+  // Wire up reject buttons
+  content.querySelectorAll('.reject-req-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      if (!confirm('Reject this request? The submission will be removed from the pending list and archived.')) return;
+      btn.disabled = true; btn.textContent = 'Rejecting…';
+      try {
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=reject&id=${encodeURIComponent(id)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+        loadPendingRequests();
+        refreshPendingBadge();
+      } catch (e) {
+        alert(`Reject failed: ${e.message}`);
+        btn.disabled = false; btn.textContent = '✗ Reject';
+      }
+    });
+  });
+}
+
+async function loadApprovalLog() {
+  const content = document.getElementById('logContent');
+  if (!content) return;
+  content.innerHTML = `<p class="text-slate-400">Loading log…</p>`;
+  const entries = await fetchApprovalLog();
+  if (entries.length === 0) {
+    content.innerHTML = `<p class="text-slate-400">No log entries yet.</p>`;
+    return;
+  }
+  content.innerHTML = entries.map(e => {
+    const ts = e.timestamp ? new Date(e.timestamp).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const color = e.action === 'APPROVED' ? 'text-green-300' : e.action === 'REJECTED' ? 'text-red-300' : 'text-slate-300';
+    const sym   = e.action === 'APPROVED' ? '✓' : e.action === 'REJECTED' ? '✗' : '•';
+    return `
+      <div class="glass rounded-xl p-3 text-xs">
+        <div class="flex justify-between items-start gap-2 mb-2">
+          <div class="${color} font-semibold">${sym} ${escapeHtml(e.action)} — ${escapeHtml(e.name)}</div>
+          <div class="text-slate-500 whitespace-nowrap">${ts}</div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-1 text-slate-400">
+          <div><span class="text-slate-500">Dept:</span> ${escapeHtml(e.department || '')}</div>
+          <div><span class="text-slate-500">Designation:</span> ${escapeHtml(e.designation || '')}</div>
+          <div><span class="text-slate-500">Expiry:</span> ${escapeHtml(e.expiry || '')}</div>
+        </div>
+        ${e.replacedName ? `
+          <div class="mt-2 pt-2 border-t border-slate-700 text-slate-400">
+            <div class="text-slate-500 mb-1">Replaced previous record:</div>
+            <div>${escapeHtml(e.replacedName)} — ${escapeHtml(e.replacedDesignation || '')} — expires ${escapeHtml(e.replacedExpiry || '')}</div>
+          </div>
+        ` : ''}
+        ${e.certUrl ? `<div class="mt-2"><a href="${escapeHtml(e.certUrl)}" target="_blank" class="text-cyan-400 underline">View certificate ↗</a></div>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 async function fetchHistory() {
@@ -991,9 +1395,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   setupMonitor();
+  setupSubmitRequest();
+  setupPendingReview();
 
   populateDepartmentDropdown();
   loadData();
+  refreshPendingBadge();
+  setInterval(refreshPendingBadge, 5 * 60 * 1000);
 
   setInterval(async () => {
     try { await loadData(); } catch (e) { console.error('Auto refresh failed:', e); }
