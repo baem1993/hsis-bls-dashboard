@@ -578,15 +578,45 @@ async function loadMonitor(force) {
                         const action = c.action;
                         const colorMap = { ADDED: 'text-green-300', REMOVED: 'text-red-300', MODIFIED: 'text-yellow-300' };
                         const symMap   = { ADDED: '+', REMOVED: '✗', MODIFIED: '✏' };
+                        // Split "DESIGNATION / EXPIRY" into separate fields
+                        const splitDetail = (s) => {
+                          const parts = String(s || '').split(' / ');
+                          return { designation: (parts[0] || '').trim(), expiry: (parts[1] || '').trim() };
+                        };
+                        const newD = splitDetail(c.newDetail);
+                        const oldD = splitDetail(c.oldDetail);
+                        const fieldRow = (label, value) => value
+                          ? `<div><span class="text-slate-500">${label}:</span> <span class="text-slate-200">${escapeHtml(value)}</span></div>`
+                          : '';
+                        let body = '';
+                        if (action === 'ADDED') {
+                          body = fieldRow('name', c.name) + fieldRow('designation', newD.designation) + fieldRow('expiry date', newD.expiry);
+                        } else if (action === 'REMOVED') {
+                          body = `<div class="text-slate-400 mb-1">Removed:</div>` +
+                                 fieldRow('name', c.name) + fieldRow('designation', oldD.designation) + fieldRow('expiry date', oldD.expiry);
+                        } else if (action === 'MODIFIED') {
+                          // Only show changed fields, with old → new
+                          const fields = [];
+                          fields.push(fieldRow('name', c.name));
+                          if (newD.designation !== oldD.designation) {
+                            fields.push(`<div><span class="text-slate-500">designation:</span> <span class="text-red-300 line-through">${escapeHtml(oldD.designation)}</span> <span class="text-slate-500">→</span> <span class="text-green-300">${escapeHtml(newD.designation)}</span></div>`);
+                          } else {
+                            fields.push(fieldRow('designation', newD.designation));
+                          }
+                          if (newD.expiry !== oldD.expiry) {
+                            fields.push(`<div><span class="text-slate-500">expiry date:</span> <span class="text-red-300 line-through">${escapeHtml(oldD.expiry)}</span> <span class="text-slate-500">→</span> <span class="text-green-300">${escapeHtml(newD.expiry)}</span></div>`);
+                          } else {
+                            fields.push(fieldRow('expiry date', newD.expiry));
+                          }
+                          body = fields.join('');
+                        }
                         return `
-                          <div class="flex gap-2 py-1 border-b border-slate-800 last:border-0">
-                            <span class="${colorMap[action] || 'text-slate-300'} font-bold w-4">${symMap[action] || '•'}</span>
+                          <div class="flex gap-2 py-2 border-b border-slate-800 last:border-0">
+                            <span class="${colorMap[action] || 'text-slate-300'} font-bold w-4 mt-0.5">${symMap[action] || '•'}</span>
                             <div class="flex-1 min-w-0">
-                              <div class="${colorMap[action] || 'text-slate-300'} font-semibold">${escapeHtml(action)} — ${escapeHtml(c.name)}</div>
-                              ${action === 'ADDED' ? `<div class="text-slate-400">${escapeHtml(c.newDetail)}</div>` : ''}
-                              ${action === 'REMOVED' ? `<div class="text-slate-400">was: ${escapeHtml(c.oldDetail)}</div>` : ''}
-                              ${action === 'MODIFIED' ? `<div class="text-slate-400">${escapeHtml(c.newDetail)} <span class="text-slate-500">(was: ${escapeHtml(c.oldDetail)})</span></div>` : ''}
-                              <div class="text-slate-500 mt-0.5">${ts}</div>
+                              <div class="${colorMap[action] || 'text-slate-300'} font-semibold mb-1">${escapeHtml(action)}</div>
+                              ${body}
+                              <div class="text-slate-500 mt-1">${ts}</div>
                             </div>
                           </div>
                         `;
