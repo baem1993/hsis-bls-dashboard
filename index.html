@@ -151,6 +151,10 @@
         <option value="VALID">Valid BLS</option>
         <option value="NOT_VALID">Not Valid BLS</option>
       </select>
+      <select id="staffTypeFilter" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white">
+        <option value="ALL">All Staff</option>
+        <option value="DOCTORS">Doctors Only</option>
+      </select>
       <input id="searchInput" type="text" placeholder="Search staff..." class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white" />
     </div>
   </div>
@@ -191,6 +195,7 @@ let allData = [];
 let filteredData = [];
 let currentDepartment = 'ALL';
 let currentBLSStatus  = 'ALL';
+let currentStaffType  = 'ALL';
 let currentSearch     = '';
 
 function safeSetText(id, value) {
@@ -208,6 +213,11 @@ function setLoading(on) {
 }
 
 // =================== Status calculation (client-side, uses today's date) ===================
+
+function isDoctor(designation) {
+  const d = String(designation || '').toUpperCase();
+  return (d.includes('PEGAWAI PERUBATAN') && !d.includes('PEMBANTU')) || d.includes('PAKAR');
+}
 
 function extractYear(str) {
   const m = String(str).match(/\b(20\d{2}|19\d{2})\b/);
@@ -790,6 +800,7 @@ function populateDepartmentDropdown() {
 function processDashboard() {
   filteredData = [...allData];
   if (currentDepartment !== 'ALL') filteredData = filteredData.filter(x => x.DEPARTMENT === currentDepartment);
+  if (currentStaffType === 'DOCTORS')   filteredData = filteredData.filter(x => isDoctor(x.DESIGNATION));
   if (currentBLSStatus === 'VALID')     filteredData = filteredData.filter(x => ['VALID','EXPIRING SOON'].includes(getStatus(x.EXPIRY)));
   if (currentBLSStatus === 'NOT_VALID') filteredData = filteredData.filter(x => !['VALID','EXPIRING SOON'].includes(getStatus(x.EXPIRY)));
   if (currentSearch) {
@@ -962,6 +973,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('blsStatusFilter')?.addEventListener('change', e => {
     currentBLSStatus = e.target.value;
+    processDashboard();
+  });
+  document.getElementById('staffTypeFilter')?.addEventListener('change', e => {
+    currentStaffType = e.target.value;
     processDashboard();
   });
   document.getElementById('searchInput')?.addEventListener('input', e => {
