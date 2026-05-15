@@ -119,9 +119,15 @@
     <div id="monitorContent" class="space-y-4 text-sm">
       <p class="text-slate-400">Loading…</p>
     </div>
-    <div class="mt-6 flex gap-3">
-      <button id="monitorRefreshBtn" class="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-xl font-semibold text-slate-900">Reload status</button>
-      <button id="monitorForceBtn" class="bg-yellow-500 hover:bg-yellow-400 px-4 py-2 rounded-xl font-semibold text-slate-900">Force re-aggregation</button>
+    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="flex flex-col items-start gap-1">
+        <button id="monitorRefreshBtn" class="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-xl font-semibold text-slate-900 w-full sm:w-auto">Reload status</button>
+        <p class="text-xs text-slate-400">Fetches the latest stats from the Apps Script (~500&nbsp;ms). Use this to refresh the numbers shown above without re-running the full aggregation.</p>
+      </div>
+      <div class="flex flex-col items-start gap-1">
+        <button id="monitorForceBtn" class="bg-yellow-500 hover:bg-yellow-400 px-4 py-2 rounded-xl font-semibold text-slate-900 w-full sm:w-auto">Force re-aggregation</button>
+        <p class="text-xs text-slate-400">Triggers the Apps Script to immediately re-fetch all 22 source sheets and rewrite the master (~30&nbsp;s). Use this if you can't wait for the next 30-minute cycle.</p>
+      </div>
     </div>
   </div>
 </div>
