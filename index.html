@@ -133,8 +133,9 @@
 </div>
 
 <script>
-// 👇 PASTE YOUR APPS SCRIPT WEB APP URL HERE (after deploying bls-dashboard.gs)
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHMv5jAsueP8LQ9XKSkSo7ZKmazoPyYB1vRipOtubh086E7DQJeHERcZIQMEj0Sd5tkg/exec';
+const MASTER_SHEET_ID = '1U8ByRXsRzOEEMqdTMPFtaljuFeHzc3pPAibR64B9ej4';
+const GOOGLE_API_KEY  = 'AIzaSyCnLr1j8vdS6b8PKBOqV2I_Mmp9b4Yg9Ow';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtBB2-8uZ5YdfK85knhVV10_xU8ksNn6fGcb6QM85XxPrUw-SAQ22pEAOm1j9ffqjz/exec';
 
 const DEPARTMENTS = [
   "Nephrology","Cardiology","Cardiothoracic Anaesthesia","Anaesthesia","Cardiothoracic",
@@ -236,6 +237,22 @@ function loadCache() {
   } catch (e) { return null; }
 }
 
+async function fetchMasterSheet() {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${MASTER_SHEET_ID}/values/Data?key=${GOOGLE_API_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const rows = json.values || [];
+  if (rows.length < 2) return [];
+  // Skip header row, map remaining rows to record objects
+  return rows.slice(1).map(r => ({
+    NAME:        r[0] || '',
+    DEPARTMENT:  r[1] || '',
+    DESIGNATION: r[2] || '',
+    EXPIRY:      r[3] || ''
+  })).filter(r => r.NAME);
+}
+
 async function loadData(forceRefresh = false) {
   // Show cached data immediately for instant feedback
   if (!forceRefresh) {
@@ -251,13 +268,13 @@ async function loadData(forceRefresh = false) {
   setLoading(true);
 
   try {
-    const url = forceRefresh ? `${APPS_SCRIPT_URL}?fresh=1` : APPS_SCRIPT_URL;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const fresh = Array.isArray(json) ? json : json.data;
+    // Force-refresh: tell Apps Script to re-aggregate before we re-read master
+    if (forceRefresh) {
+      try { await fetch(`${APPS_SCRIPT_URL}?fresh=1`); } catch (e) { console.warn('Force-refresh ping failed:', e); }
+    }
 
-    if (!Array.isArray(fresh)) throw new Error('Bad payload');
+    const fresh = await fetchMasterSheet();
+    if (fresh.length === 0) throw new Error('Master sheet returned no data');
 
     // Guard against partial responses overwriting good cached data
     const cached = loadCache();
@@ -271,7 +288,7 @@ async function loadData(forceRefresh = false) {
   } catch (e) {
     console.error('Load failed:', e);
     if (allData.length === 0) {
-      safeSetText('lastUpdated', 'Failed to load — check Apps Script URL');
+      safeSetText('lastUpdated', 'Failed to load — check MASTER_SHEET_ID');
     }
   }
 
