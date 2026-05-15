@@ -679,7 +679,14 @@ async function refreshPendingBadge() {
 async function loadPendingRequests() {
   const content = document.getElementById('pendingContent');
   if (!content) return;
-  content.innerHTML = `<p class="text-slate-400">Loading pending requests…</p>`;
+  content.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-10 gap-3">
+      <svg class="animate-spin w-10 h-10 text-cyan-400" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <div class="text-slate-400 text-sm">Loading pending requests…</div>
+    </div>`;
 
   const requests = await fetchPendingRequests();
   if (requests.length === 0) {
@@ -793,7 +800,14 @@ async function loadPendingRequests() {
 async function loadApprovalLog() {
   const content = document.getElementById('logContent');
   if (!content) return;
-  content.innerHTML = `<p class="text-slate-400">Loading log…</p>`;
+  content.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-10 gap-3">
+      <svg class="animate-spin w-10 h-10 text-cyan-400" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <div class="text-slate-400 text-sm">Loading log…</div>
+    </div>`;
   const entries = await fetchApprovalLog();
   if (entries.length === 0) {
     content.innerHTML = `<p class="text-slate-400">No log entries yet.</p>`;
