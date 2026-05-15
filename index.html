@@ -129,8 +129,11 @@
         <p class="text-xs text-slate-400">Triggers the Apps Script to immediately re-fetch all 22 source sheets and rewrite the master (~30&nbsp;s). Use this if you can't wait for the next 30-minute cycle.</p>
       </div>
       <div class="flex flex-col items-start gap-1">
-        <button id="monitorMarkSeenBtn" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-xl font-semibold text-white w-full sm:w-auto">Mark all changes as seen</button>
-        <p class="text-xs text-slate-400">Resets the change counter so you only see new edits after this moment. Use this once you've reviewed the current changes.</p>
+        <div class="flex flex-col sm:flex-row gap-2 w-full">
+          <button id="monitorMarkSeenBtn" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-xl font-semibold text-white w-full sm:w-auto">Mark all changes as seen</button>
+          <button id="monitorUndoBtn" class="hidden bg-orange-500 hover:bg-orange-400 px-4 py-2 rounded-xl font-semibold text-slate-900 w-full sm:w-auto">↶ Undo</button>
+        </div>
+        <p class="text-xs text-slate-400">Resets the change counter so you only see new edits after this moment. Use this once you've reviewed the current changes. Undo restores the previous baseline.</p>
       </div>
     </div>
   </div>
@@ -334,7 +337,7 @@ async function loadData(forceRefresh = false) {
 
   populateDepartmentDropdown();
   processDashboard();
-  safeSetText('lastUpdated', new Date().toLocaleString());
+  safeSetText('lastUpdated', new Date().toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'}));
   setLoading(false);
 
   // Fetch protection status separately (non-blocking)
@@ -376,7 +379,19 @@ function setupMonitor() {
     }
   });
   document.getElementById('monitorMarkSeenBtn')?.addEventListener('click', () => {
+    const prev = localStorage.getItem('lastSeenChanges') || '1970-01-01T00:00:00Z';
+    localStorage.setItem('prevLastSeenChanges', prev);
     localStorage.setItem('lastSeenChanges', new Date().toISOString());
+    document.getElementById('monitorUndoBtn')?.classList.remove('hidden');
+    loadMonitor(false);
+  });
+  document.getElementById('monitorUndoBtn')?.addEventListener('click', () => {
+    const prev = localStorage.getItem('prevLastSeenChanges');
+    if (prev) {
+      localStorage.setItem('lastSeenChanges', prev);
+      localStorage.removeItem('prevLastSeenChanges');
+    }
+    document.getElementById('monitorUndoBtn')?.classList.add('hidden');
     loadMonitor(false);
   });
 }
@@ -402,6 +417,11 @@ async function fetchHistory() {
 
 function openMonitor() {
   document.getElementById('monitorModal')?.classList.remove('hidden');
+  // Show undo button if there's a recent baseline to restore
+  const undoBtn = document.getElementById('monitorUndoBtn');
+  if (undoBtn) {
+    undoBtn.classList.toggle('hidden', !localStorage.getItem('prevLastSeenChanges'));
+  }
   loadMonitor(false);
 }
 
@@ -442,10 +462,10 @@ async function loadMonitor(force) {
       return a.localeCompare(b);
     });
 
-    const updated = status.lastUpdate ? new Date(status.lastUpdate).toLocaleString() : 'never';
+    const updated = status.lastUpdate ? new Date(status.lastUpdate).toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'}) : 'never';
     const protectedDepts = (status.lastProtected && status.lastProtected !== 'none') ? status.lastProtected : null;
     const totalNewChanges = newChanges.length;
-    const lastSeenDisplay = lastSeen === '1970-01-01T00:00:00Z' ? 'never (showing all)' : new Date(lastSeen).toLocaleString();
+    const lastSeenDisplay = lastSeen === '1970-01-01T00:00:00Z' ? 'never (showing all)' : new Date(lastSeen).toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'});
 
     content.innerHTML = `
       <div class="grid grid-cols-3 gap-3">
@@ -498,7 +518,7 @@ async function loadMonitor(force) {
                   ${changes.length === 0
                     ? `<p class="text-slate-500 italic">No new changes since last seen.</p>`
                     : changes.map(c => {
-                        const ts = new Date(c.timestamp).toLocaleString();
+                        const ts = new Date(c.timestamp).toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'});
                         const action = c.action;
                         const colorMap = { ADDED: 'text-green-300', REMOVED: 'text-red-300', MODIFIED: 'text-yellow-300' };
                         const symMap   = { ADDED: '+', REMOVED: '✗', MODIFIED: '✏' };
