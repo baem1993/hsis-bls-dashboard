@@ -432,6 +432,52 @@ function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Collapse multiple history entries for the same name down to one net entry.
+// Drops transient changes (e.g. ADDED then REMOVED) and merges sequential
+// MODIFIED entries into a single first→last diff. Result is sorted newest-first.
+function collapseChanges(entries) {
+  const sorted = [...entries].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const byName = {};
+  sorted.forEach(c => {
+    const key = String(c.name || '').toUpperCase();
+    (byName[key] = byName[key] || []).push(c);
+  });
+
+  const result = [];
+  Object.keys(byName).forEach(key => {
+    const events = byName[key];
+    const first = events[0];
+    const last  = events[events.length - 1];
+
+    // What the name looked like before any change in this window:
+    const initialDetail = first.action === 'ADDED' ? null
+                        : first.action === 'REMOVED' ? first.oldDetail
+                        : first.oldDetail;
+    // What the name looks like now:
+    const finalDetail   = last.action === 'REMOVED' ? null : last.newDetail;
+
+    // Net effect: compare initial vs final
+    if (initialDetail === null && finalDetail === null) {
+      // Added then removed — transient, skip
+      return;
+    }
+    if (initialDetail === null && finalDetail !== null) {
+      result.push({ ...last, action: 'ADDED', name: last.name, newDetail: finalDetail, oldDetail: '', timestamp: last.timestamp });
+      return;
+    }
+    if (initialDetail !== null && finalDetail === null) {
+      result.push({ ...last, action: 'REMOVED', name: last.name, newDetail: '', oldDetail: initialDetail, timestamp: last.timestamp });
+      return;
+    }
+    // Both present — modified if different, otherwise no net change
+    if (String(initialDetail) === String(finalDetail)) return;
+    result.push({ ...last, action: 'MODIFIED', name: last.name, newDetail: finalDetail, oldDetail: initialDetail, timestamp: last.timestamp });
+  });
+
+  // Newest first
+  return result.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
 async function loadMonitor(force) {
   const content    = document.getElementById('monitorContent');
   const refreshBtn = document.getElementById('monitorRefreshBtn');
@@ -497,10 +543,14 @@ async function loadMonitor(force) {
     const lastSeen = localStorage.getItem('lastSeenChanges') || '1970-01-01T00:00:00Z';
     const newChanges = history.filter(h => h.timestamp > lastSeen);
 
-    // Group new changes by department
+    // Group new changes by department, then collapse per-name to net effect.
+    // Without this, a single rename shows up as ADDED + REMOVED of the same name.
     const changesByDept = {};
     newChanges.forEach(h => {
       (changesByDept[h.department] = changesByDept[h.department] || []).push(h);
+    });
+    Object.keys(changesByDept).forEach(d => {
+      changesByDept[d] = collapseChanges(changesByDept[d]);
     });
 
     // Sort departments: those with new changes first (by count desc), then alphabetically
