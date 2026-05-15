@@ -615,6 +615,22 @@ function nameSimilarity(a, b) {
   return inter / union;
 }
 
+// Format an expiry value for display. Apps Script returns Date cells as
+// full ISO strings (with time/timezone). Strip to a YYYY-MM-DD or pass
+// through plain year/text values unchanged.
+function formatExpiry(value) {
+  const s = String(value || '').trim();
+  if (!s) return '—';
+  // Full ISO with time → take date part in Malaysia time
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d)) {
+      return d.toLocaleDateString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  }
+  return s;
+}
+
 function findSimilarNames(name, limit) {
   const scored = allData.map(r => ({ rec: r, score: nameSimilarity(name, r.NAME) }))
     .filter(x => x.score >= 0.5)
@@ -676,6 +692,47 @@ async function refreshPendingBadge() {
   }
 }
 
+function showPendingLoading(title, subtitle) {
+  const content = document.getElementById('pendingContent');
+  if (!content) return;
+  content.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-12 gap-4">
+      <svg class="animate-spin w-12 h-12 text-cyan-400" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <div class="text-center">
+        <div class="text-cyan-300 font-semibold">${escapeHtml(title || 'Working…')}</div>
+        ${subtitle ? `<div class="text-slate-400 text-xs mt-1">${escapeHtml(subtitle)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function runBulkApprove(items) {
+  showPendingLoading(`Approving ${items.length} request${items.length > 1 ? 's' : ''}…`, 'Writing to source sheets. Please don\'t close this window.');
+  const errors = [];
+  for (let i = 0; i < items.length; i++) {
+    const { id, replace } = items[i];
+    try {
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=approve&id=${encodeURIComponent(id)}&replace=${encodeURIComponent(replace)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+      showPendingLoading(`Approved ${i + 1} of ${items.length}…`, 'Working through the queue.');
+    } catch (e) {
+      errors.push({ id, error: e.message });
+    }
+  }
+  showPendingLoading('Re-aggregating master sheet…', 'Fetching all source sheets. This usually takes 20–40 seconds.');
+  try {
+    await loadData({ skipCache: true, forceAggregation: true });
+  } catch (e) { console.error(e); }
+  if (errors.length > 0) {
+    alert(`${items.length - errors.length} approved successfully. ${errors.length} failed:\n\n` + errors.map(e => `• ${e.error}`).join('\n'));
+  }
+  loadPendingRequests();
+  refreshPendingBadge();
+}
+
 async function loadPendingRequests() {
   const content = document.getElementById('pendingContent');
   if (!content) return;
@@ -694,7 +751,19 @@ async function loadPendingRequests() {
     return;
   }
 
-  content.innerHTML = requests.map(req => {
+  const bulkBar = `
+    <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-800/60 border border-slate-700 rounded-xl p-3 mb-1 sticky top-0 z-10">
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+        <input type="checkbox" id="pendingSelectAll" class="w-4 h-4"/>
+        <span>Select all (<span id="pendingTotalCount">${requests.length}</span>)</span>
+      </label>
+      <div class="flex items-center gap-3">
+        <span id="pendingSelectedCount" class="text-xs text-slate-400">0 selected</span>
+        <button id="pendingApproveSelectedBtn" disabled class="bg-green-500 hover:bg-green-400 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed px-4 py-2 rounded-lg font-semibold text-slate-900 text-sm">✓ Approve selected</button>
+      </div>
+    </div>`;
+
+  content.innerHTML = bulkBar + requests.map(req => {
     const similar = findSimilarNames(req.name, 3);
     const submittedAt = req.timestamp ? new Date(req.timestamp).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'short' }) : '—';
     const exactMatch = similar.find(s => s.score === 1);
@@ -703,22 +772,25 @@ async function loadPendingRequests() {
     return `
       <div class="glass rounded-xl p-4" data-req-id="${escapeHtml(req.id)}">
         <div class="flex justify-between items-start gap-3 mb-3">
-          <div class="flex-1 min-w-0">
-            <div class="text-lg font-semibold text-white">${escapeHtml(req.name)}</div>
-            <div class="text-xs text-slate-500">Submitted ${submittedAt}</div>
+          <div class="flex items-start gap-3 flex-1 min-w-0">
+            <input type="checkbox" class="pending-select-cb w-4 h-4 mt-1.5" data-id="${escapeHtml(req.id)}" data-exact="${exactMatch ? escapeHtml(exactMatch.rec.NAME) : ''}"/>
+            <div class="flex-1 min-w-0">
+              <div class="text-lg font-semibold text-white">${escapeHtml(req.name)}</div>
+              <div class="text-xs text-slate-500">Submitted ${submittedAt}</div>
+            </div>
           </div>
           ${req.certUrl ? `<a href="${escapeHtml(req.certUrl)}" target="_blank" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg text-cyan-300 whitespace-nowrap">View cert ↗</a>` : ''}
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-3">
           <div><span class="text-slate-500">Department:</span> <span class="text-slate-200">${escapeHtml(req.department)}</span></div>
           <div><span class="text-slate-500">Designation:</span> <span class="text-slate-200">${escapeHtml(req.designation)}</span></div>
-          <div><span class="text-slate-500">Expiry:</span> <span class="text-slate-200">${escapeHtml(req.expiry)}</span></div>
+          <div><span class="text-slate-500">Expiry:</span> <span class="text-slate-200">${escapeHtml(formatExpiry(req.expiry))}</span></div>
         </div>
 
         ${exactMatch ? `
           <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3 text-xs">
             <div class="text-yellow-200 font-semibold mb-1">⚠ Exact name match found in master</div>
-            <div class="text-yellow-200/80">${escapeHtml(exactMatch.rec.NAME)} — ${escapeHtml(exactMatch.rec.DEPARTMENT)} — ${escapeHtml(exactMatch.rec.DESIGNATION)} — expires ${escapeHtml(exactMatch.rec.EXPIRY)}</div>
+            <div class="text-yellow-200/80">${escapeHtml(exactMatch.rec.NAME)} — ${escapeHtml(exactMatch.rec.DEPARTMENT)} — ${escapeHtml(exactMatch.rec.DESIGNATION)} — expires ${escapeHtml(formatExpiry(exactMatch.rec.EXPIRY))}</div>
             <div class="text-yellow-200/60 mt-1">Approving will REPLACE this record.</div>
           </div>
         ` : fuzzyMatches.length > 0 ? `
@@ -728,7 +800,7 @@ async function loadPendingRequests() {
               ${fuzzyMatches.map(m => `
                 <label class="flex items-start gap-2 cursor-pointer">
                   <input type="radio" name="replace-${escapeHtml(req.id)}" value="${escapeHtml(m.rec.NAME)}" class="mt-1"/>
-                  <span class="text-slate-300">${escapeHtml(m.rec.NAME)} <span class="text-slate-500">— ${escapeHtml(m.rec.DEPARTMENT)} — ${escapeHtml(m.rec.DESIGNATION)} — expires ${escapeHtml(m.rec.EXPIRY)}</span> <span class="text-slate-500">(${Math.round(m.score * 100)}% match)</span></span>
+                  <span class="text-slate-300">${escapeHtml(m.rec.NAME)} <span class="text-slate-500">— ${escapeHtml(m.rec.DEPARTMENT)} — ${escapeHtml(m.rec.DESIGNATION)} — expires ${escapeHtml(formatExpiry(m.rec.EXPIRY))}</span> <span class="text-slate-500">(${Math.round(m.score * 100)}% match)</span></span>
                 </label>
               `).join('')}
               <label class="flex items-start gap-2 cursor-pointer pt-1 border-t border-slate-700">
@@ -747,6 +819,32 @@ async function loadPendingRequests() {
     `;
   }).join('');
 
+  // Wire up bulk-select controls
+  const selectAll = content.querySelector('#pendingSelectAll');
+  const selectedCount = content.querySelector('#pendingSelectedCount');
+  const approveSelectedBtn = content.querySelector('#pendingApproveSelectedBtn');
+  const cbs = () => Array.from(content.querySelectorAll('.pending-select-cb'));
+  const updateSelected = () => {
+    const checked = cbs().filter(c => c.checked);
+    if (selectedCount) selectedCount.textContent = `${checked.length} selected`;
+    if (approveSelectedBtn) approveSelectedBtn.disabled = checked.length === 0;
+    if (selectAll) selectAll.checked = checked.length === cbs().length && cbs().length > 0;
+  };
+  cbs().forEach(c => c.addEventListener('change', updateSelected));
+  selectAll?.addEventListener('change', () => {
+    cbs().forEach(c => { c.checked = selectAll.checked; });
+    updateSelected();
+  });
+  approveSelectedBtn?.addEventListener('click', async () => {
+    const checked = cbs().filter(c => c.checked);
+    if (checked.length === 0) return;
+    const exactCount = checked.filter(c => c.getAttribute('data-exact')).length;
+    let msg = `Approve ${checked.length} request${checked.length > 1 ? 's' : ''}?`;
+    if (exactCount > 0) msg += `\n\n${exactCount} will REPLACE an existing record with the same name. Others will be added as new.`;
+    if (!confirm(msg)) return;
+    await runBulkApprove(checked.map(c => ({ id: c.getAttribute('data-id'), replace: c.getAttribute('data-exact') || '' })));
+  });
+
   // Wire up approve buttons
   content.querySelectorAll('.approve-req-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -761,12 +859,13 @@ async function loadPendingRequests() {
       if (!confirm(confirmMsg)) return;
       btn.disabled = true; btn.textContent = 'Approving…';
       try {
+        showPendingLoading('Approving…', 'Writing to source sheet.');
         const res = await fetch(`${APPS_SCRIPT_URL}?action=approve&id=${encodeURIComponent(id)}&replace=${encodeURIComponent(replace)}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
-        // Approval writes to the source department tab only; trigger an
+        // Approval writes to the source department sheet only; trigger an
         // immediate re-aggregation so the dashboard reflects it right away.
-        btn.textContent = 'Re-aggregating…';
+        showPendingLoading('Re-aggregating master sheet…', 'Fetching all source sheets. This usually takes 20–40 seconds.');
         await loadData({ skipCache: true, forceAggregation: true });
         loadPendingRequests();
         refreshPendingBadge();
