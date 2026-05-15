@@ -296,9 +296,13 @@ async function fetchMasterSheet() {
   })).filter(r => r.NAME);
 }
 
-async function loadData(forceRefresh = false) {
+async function loadData(opts) {
+  // Backwards-compat: a bare boolean was previously used; treat as skipCache
+  if (typeof opts === 'boolean') opts = { skipCache: opts };
+  const { skipCache = false, forceAggregation = false } = opts || {};
+
   // Show cached data immediately for instant feedback
-  if (!forceRefresh) {
+  if (!skipCache) {
     const cached = loadCache();
     if (cached) {
       allData = cached;
@@ -311,9 +315,8 @@ async function loadData(forceRefresh = false) {
   setLoading(true);
 
   try {
-    // Force-refresh: tell Apps Script to re-aggregate before we re-read master
-    if (forceRefresh) {
-      try { await fetch(`${APPS_SCRIPT_URL}?fresh=1`); } catch (e) { console.warn('Force-refresh ping failed:', e); }
+    if (forceAggregation) {
+      try { await fetch(`${APPS_SCRIPT_URL}?fresh=1`); } catch (e) { console.warn('Force-aggregation ping failed:', e); }
     }
 
     const fresh = await fetchMasterSheet();
@@ -609,7 +612,8 @@ async function loadMonitor(force) {
     });
 
     if (force) {
-      await loadData(true);
+      // Aggregation already triggered above via ?fresh=1; just re-read master
+      await loadData({ skipCache: true });
     }
   } catch (e) {
     content.innerHTML = `<p class="text-red-300">Failed to load: ${escapeHtml(e.message)}</p>`;
@@ -831,7 +835,10 @@ document.addEventListener('DOMContentLoaded', () => {
     processDashboard();
   });
   document.getElementById('refreshButton')?.addEventListener('click', async () => {
-    await loadData(true);
+    // Just re-read the master sheet; the master is on a 30-min auto-refresh
+    // schedule. Use the Admin Monitor → "Force re-aggregation" if you really
+    // want to bypass the schedule.
+    await loadData({ skipCache: true });
   });
 
   setupMonitor();
