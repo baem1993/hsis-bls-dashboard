@@ -432,6 +432,27 @@ function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Parse a timestamp string from the History tab. Handles both legacy ISO
+// (e.g. "2026-05-15T08:34:44.992Z") and new Malaysia-local format
+// (e.g. "2026-05-15 16:34:44"). Returns a Date object or null.
+function parseTimestamp(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  // ISO with Z or offset
+  if (/T/.test(str) && (/Z$/.test(str) || /[+-]\d{2}:?\d{2}$/.test(str))) {
+    const d = new Date(str);
+    return isNaN(d) ? null : d;
+  }
+  // "yyyy-mm-dd hh:mm:ss" → assume Asia/Kuala_Lumpur (UTC+8)
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (m) {
+    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+08:00`);
+    return isNaN(d) ? null : d;
+  }
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
 // Collapse multiple history entries for the same name down to one net entry.
 // Drops transient changes (e.g. ADDED then REMOVED) and merges sequential
 // MODIFIED entries into a single first→last diff. Result is sorted newest-first.
@@ -539,9 +560,14 @@ async function loadMonitor(force) {
     const deptCounts = {};
     allData.forEach(r => { deptCounts[r.DEPARTMENT] = (deptCounts[r.DEPARTMENT] || 0) + 1; });
 
-    // Filter history by lastSeenChanges timestamp
+    // Filter history by lastSeenChanges timestamp (compare as Date objects so
+    // mixed legacy-ISO and new-KL formats both sort correctly)
     const lastSeen = localStorage.getItem('lastSeenChanges') || '1970-01-01T00:00:00Z';
-    const newChanges = history.filter(h => h.timestamp > lastSeen);
+    const lastSeenMs = (parseTimestamp(lastSeen) || new Date(0)).getTime();
+    const newChanges = history.filter(h => {
+      const d = parseTimestamp(h.timestamp);
+      return d && d.getTime() > lastSeenMs;
+    });
 
     // Group new changes by department, then collapse per-name to net effect.
     // Without this, a single rename shows up as ADDED + REMOVED of the same name.
@@ -565,7 +591,10 @@ async function loadMonitor(force) {
     const updated = status.lastUpdate ? new Date(status.lastUpdate).toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'}) : 'never';
     const protectedDepts = (status.lastProtected && status.lastProtected !== 'none') ? status.lastProtected : null;
     const totalNewChanges = newChanges.length;
-    const lastSeenDisplay = lastSeen === '1970-01-01T00:00:00Z' ? 'never (showing all)' : new Date(lastSeen).toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'});
+    const lastSeenParsed = parseTimestamp(lastSeen);
+    const lastSeenDisplay = (!lastSeenParsed || lastSeen === '1970-01-01T00:00:00Z')
+      ? 'never (showing all)'
+      : lastSeenParsed.toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'});
 
     content.innerHTML = `
       <div class="grid grid-cols-3 gap-3">
@@ -624,7 +653,8 @@ async function loadMonitor(force) {
                   ${changes.length === 0
                     ? `<p class="text-slate-500 italic">No new changes since last seen.</p>`
                     : changes.map(c => {
-                        const ts = new Date(c.timestamp).toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'});
+                        const tsDate = parseTimestamp(c.timestamp);
+                        const ts = tsDate ? tsDate.toLocaleString('en-MY', {timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'medium'}) : escapeHtml(c.timestamp);
                         const action = c.action;
                         const colorMap = { ADDED: 'text-green-300', REMOVED: 'text-red-300', MODIFIED: 'text-yellow-300' };
                         const symMap   = { ADDED: '+', REMOVED: '✗', MODIFIED: '✏' };
