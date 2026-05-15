@@ -109,6 +109,23 @@
   <div id="deptChartBars"></div>
 </div>
 
+<!-- Admin monitor modal -->
+<div id="monitorModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="glass rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-cyan-400">System Monitor</h2>
+      <button id="monitorCloseBtn" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div id="monitorContent" class="space-y-4 text-sm">
+      <p class="text-slate-400">Loading…</p>
+    </div>
+    <div class="mt-6 flex gap-3">
+      <button id="monitorRefreshBtn" class="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-xl font-semibold text-slate-900">Reload status</button>
+      <button id="monitorForceBtn" class="bg-yellow-500 hover:bg-yellow-400 px-4 py-2 rounded-xl font-semibold text-slate-900">Force re-aggregation</button>
+    </div>
+  </div>
+</div>
+
 <div class="glass rounded-2xl p-5 overflow-auto">
   <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
     <h2 class="text-xl font-semibold">Staff Certification Records</h2>
@@ -137,6 +154,12 @@
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
+</div>
+
+<div class="mt-8 flex justify-center">
+  <button id="monitorOpenBtn" class="text-slate-500 hover:text-slate-300 text-xs underline underline-offset-4">
+    Admin Monitor
+  </button>
 </div>
 
 <script>
@@ -306,6 +329,117 @@ async function loadData(forceRefresh = false) {
 
   // Fetch protection status separately (non-blocking)
   updateProtectionBadge();
+}
+
+// =================== Admin Monitor (password-gated) ===================
+
+const MONITOR_PASSWORD = '199365';
+
+function setupMonitor() {
+  const openBtn    = document.getElementById('monitorOpenBtn');
+  const closeBtn   = document.getElementById('monitorCloseBtn');
+  const modal      = document.getElementById('monitorModal');
+  const refreshBtn = document.getElementById('monitorRefreshBtn');
+  const forceBtn   = document.getElementById('monitorForceBtn');
+
+  openBtn?.addEventListener('click', () => {
+    if (sessionStorage.getItem('monitorAuthed') === '1') {
+      openMonitor();
+      return;
+    }
+    const pwd = prompt('Enter admin password:');
+    if (pwd === null) return;
+    if (pwd !== MONITOR_PASSWORD) {
+      alert('Wrong password.');
+      return;
+    }
+    sessionStorage.setItem('monitorAuthed', '1');
+    openMonitor();
+  });
+
+  closeBtn?.addEventListener('click', () => modal.classList.add('hidden'));
+  modal?.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+  refreshBtn?.addEventListener('click', () => loadMonitor(false));
+  forceBtn?.addEventListener('click', () => {
+    if (confirm('Force re-aggregation now? This will fetch all 22 source sheets and rewrite the master sheet. Takes ~30 seconds.')) {
+      loadMonitor(true);
+    }
+  });
+}
+
+function openMonitor() {
+  document.getElementById('monitorModal')?.classList.remove('hidden');
+  loadMonitor(false);
+}
+
+async function loadMonitor(force) {
+  const content = document.getElementById('monitorContent');
+  if (!content) return;
+  content.innerHTML = `<p class="text-slate-400">${force ? 'Forcing re-aggregation (~30s)…' : 'Loading…'}</p>`;
+  try {
+    const url = force ? `${APPS_SCRIPT_URL}?fresh=1` : APPS_SCRIPT_URL;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const status = await res.json();
+
+    // Compute per-department counts from current dashboard data
+    const deptCounts = {};
+    allData.forEach(r => { deptCounts[r.DEPARTMENT] = (deptCounts[r.DEPARTMENT] || 0) + 1; });
+    const sortedDepts = Object.entries(deptCounts).sort((a, b) => b[1] - a[1]);
+
+    const updated = status.lastUpdate ? new Date(status.lastUpdate).toLocaleString() : 'never';
+    const protectedDepts = (status.lastProtected && status.lastProtected !== 'none') ? status.lastProtected : null;
+
+    content.innerHTML = `
+      <div class="grid grid-cols-2 gap-4">
+        <div class="glass rounded-xl p-3">
+          <div class="text-slate-400 text-xs">Last master refresh</div>
+          <div class="text-white font-semibold mt-1">${updated}</div>
+        </div>
+        <div class="glass rounded-xl p-3">
+          <div class="text-slate-400 text-xs">Total records</div>
+          <div class="text-white font-semibold mt-1">${status.lastCount}</div>
+        </div>
+      </div>
+
+      ${protectedDepts ? `
+        <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3">
+          <div class="text-yellow-200 font-semibold">🛡 Protected on last sync</div>
+          <div class="text-yellow-200/80 text-xs mt-1">${protectedDepts}</div>
+          <div class="text-yellow-200/60 text-xs mt-2">Format: dept (fresh→existing). Existing data was kept because the source-sheet fetch returned less than 50% of previous count.</div>
+        </div>
+      ` : `
+        <div class="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-green-300">
+          ✓ All departments synced normally on last refresh
+        </div>
+      `}
+
+      <div>
+        <div class="text-slate-400 text-xs mb-2">Per-department record count (current dashboard view)</div>
+        <div class="glass rounded-xl divide-y divide-slate-700/50 max-h-64 overflow-auto">
+          ${sortedDepts.map(([d, n]) => `
+            <div class="flex justify-between px-3 py-2 ${n <= 1 ? 'bg-red-500/10' : ''}">
+              <span class="text-slate-200">${d}</span>
+              <span class="font-semibold ${n <= 1 ? 'text-red-300' : 'text-cyan-300'}">${n}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="text-xs text-slate-500 mt-2">Departments with ≤1 record are highlighted (likely empty source sheet).</div>
+      </div>
+
+      <div class="text-xs text-slate-500 pt-2 border-t border-slate-700/50">
+        <div>Master sheet: <a href="https://docs.google.com/spreadsheets/d/${status.masterSheetId}/edit" target="_blank" class="text-cyan-400 underline">open in Google Sheets</a></div>
+        <div class="mt-1">Auto-refresh: every 30 minutes</div>
+      </div>
+    `;
+
+    if (force) {
+      // Reload main dashboard data after a forced refresh
+      await loadData(true);
+    }
+  } catch (e) {
+    content.innerHTML = `<p class="text-red-300">Failed to load: ${e.message}</p>`;
+  }
 }
 
 async function updateProtectionBadge() {
@@ -523,6 +657,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('refreshButton')?.addEventListener('click', async () => {
     await loadData(true);
   });
+
+  setupMonitor();
 
   populateDepartmentDropdown();
   loadData();
