@@ -118,9 +118,13 @@
     </div>
     <p class="text-slate-400 text-sm mb-4">Fill in your details below. Your submission will be reviewed by an admin before it appears on the dashboard.</p>
     <form id="submitForm" class="space-y-4">
-      <div>
+      <div class="relative">
         <label class="block text-sm text-slate-300 mb-1">Full Name <span class="text-red-400">*</span></label>
-        <input id="reqName" type="text" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white" placeholder="e.g. Ahmad Bin Ali"/>
+        <input id="reqName" type="text" required autocomplete="off" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white" placeholder="e.g. Ahmad Bin Ali"/>
+        <ul id="reqNameSuggestions" class="hidden absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden shadow-xl max-h-52 overflow-y-auto"></ul>
+        <div id="reqExistingHint" class="hidden mt-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-cyan-300">
+          Existing record found — department &amp; designation pre-filled. Only update the expiry date and attach your new certificate.
+        </div>
       </div>
       <div>
         <label class="block text-sm text-slate-300 mb-1">Department <span class="text-red-400">*</span></label>
@@ -139,7 +143,7 @@
       <div>
         <label class="block text-sm text-slate-300 mb-1">BLS Certificate (image/PDF) <span class="text-red-400">*</span></label>
         <input id="reqCert" type="file" required accept="image/*,application/pdf" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm"/>
-        <p class="text-xs text-slate-500 mt-1">Max 5 MB. JPG, PNG or PDF.</p>
+        <p class="text-xs text-slate-500 mt-1">Max 10 MB. JPG, PNG or PDF.</p>
       </div>
       <div id="submitStatus" class="hidden text-sm rounded-xl px-4 py-2"></div>
       <div class="flex gap-3 pt-2">
@@ -464,9 +468,58 @@ function setupSubmitRequest() {
     });
   }
 
-  const close = () => { modal?.classList.add('hidden'); };
+  // Name autocomplete
+  const nameInput   = document.getElementById('reqName');
+  const suggestions = document.getElementById('reqNameSuggestions');
+  const existHint   = document.getElementById('reqExistingHint');
+
+  function closeSuggestions() { suggestions?.classList.add('hidden'); }
+
+  function fillFromRecord(rec) {
+    if (nameInput)  nameInput.value  = rec.NAME;
+    if (deptSel)    deptSel.value    = rec.DEPARTMENT;
+    const desigEl = document.getElementById('reqDesig');
+    if (desigEl)    desigEl.value    = rec.DESIGNATION;
+    existHint?.classList.remove('hidden');
+    closeSuggestions();
+  }
+
+  nameInput?.addEventListener('input', () => {
+    existHint?.classList.add('hidden');
+    const q = nameInput.value.trim().toLowerCase();
+    if (q.length < 2 || !allData.length) { closeSuggestions(); return; }
+    const matches = allData
+      .filter(r => r.NAME.toLowerCase().includes(q))
+      .slice(0, 8);
+    if (!matches.length) { closeSuggestions(); return; }
+    suggestions.innerHTML = matches.map((r, i) =>
+      `<li data-i="${i}" class="px-4 py-2 cursor-pointer hover:bg-slate-700 text-sm">
+        <span class="text-white font-medium">${escapeHtml(r.NAME)}</span>
+        <span class="text-slate-400 ml-2">${escapeHtml(r.DEPARTMENT)}</span>
+        <span class="text-slate-500 ml-1 text-xs">· ${escapeHtml(r.DESIGNATION)}</span>
+      </li>`
+    ).join('');
+    suggestions._matches = matches;
+    suggestions.classList.remove('hidden');
+  });
+
+  suggestions?.addEventListener('mousedown', e => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    e.preventDefault();
+    fillFromRecord(suggestions._matches[+li.dataset.i]);
+  });
+
+  nameInput?.addEventListener('blur', () => setTimeout(closeSuggestions, 150));
+
+  const close = () => {
+    modal?.classList.add('hidden');
+    closeSuggestions();
+  };
   openBtn?.addEventListener('click', () => {
     form?.reset();
+    existHint?.classList.add('hidden');
+    closeSuggestions();
     const status = document.getElementById('submitStatus');
     if (status) { status.classList.add('hidden'); status.textContent = ''; }
     modal?.classList.remove('hidden');
@@ -497,8 +550,8 @@ function setupSubmitRequest() {
       setStatus('Please fill in all required fields.', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setStatus('File is larger than 5 MB. Please upload a smaller file.', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      setStatus('File is larger than 10 MB. Please upload a smaller file.', 'error');
       return;
     }
 
@@ -510,7 +563,11 @@ function setupSubmitRequest() {
       if (label) label.textContent = on ? 'Uploading…' : 'Submit for Review';
     };
     setBusy(true);
-    setStatus('Uploading… please wait. Large certificates may take 30 seconds.', 'info');
+    const sizeMB = file.size / (1024 * 1024);
+    const uploadMsg = sizeMB > 4
+      ? `Uploading… your file is ${sizeMB.toFixed(1)} MB — this may take up to a minute. Please don't close this window.`
+      : 'Uploading… please wait.';
+    setStatus(uploadMsg, 'info');
 
     try {
       const certBase64 = await new Promise((resolve, reject) => {
