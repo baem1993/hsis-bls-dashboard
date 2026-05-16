@@ -259,6 +259,7 @@
         <th>Designation</th>
         <th>Expiry Year</th>
         <th>Status</th>
+        <th>Cert</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
@@ -280,7 +281,8 @@ const DEPARTMENTS = [
   "Nephrology","Cardiology","Cardiothoracic Anaesthesia","Anaesthesia","Cardiothoracic",
   "Emergency","Medical","Obstetric & Gynaecology","Ophthalmology","Oral & Maxillofacial Surgery",
   "Otorhinolaryngology","Orthopaedic","Paediatric Dentistry","Paediatrics","Pathology",
-  "Psychiatry","Pulmonology","Radiology","Rehabilitation Medicine","Surgical","Transfusion","Urology"
+  "Psychiatry","Pulmonology","Radiology","Rehabilitation Medicine","Surgical","Transfusion","Urology",
+  "Unit Pengurusan Risiko Dan Survelan Klinikal"
 ];
 
 let allData = [];
@@ -303,8 +305,6 @@ function setLoading(on) {
   if (label)   label.textContent = on ? 'Loading...' : 'Refresh Data';
   if (btn)     btn.disabled = on;
 }
-
-// =================== Status calculation (client-side, uses today's date) ===================
 
 function isDoctor(designation) {
   const d = String(designation || '').toUpperCase();
@@ -363,8 +363,6 @@ function getStatus(expiry) {
   return 'VALID';
 }
 
-// =================== Single-fetch data loading ===================
-
 const CACHE_KEY = 'bls_dashboard_cache';
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -389,12 +387,12 @@ async function fetchMasterSheet() {
   const json = await res.json();
   const rows = json.values || [];
   if (rows.length < 2) return [];
-  // Skip header row, map remaining rows to record objects
   return rows.slice(1).map(r => ({
     NAME:        r[0] || '',
     DEPARTMENT:  r[1] || '',
     DESIGNATION: r[2] || '',
-    EXPIRY:      r[3] || ''
+    EXPIRY:      r[3] || '',
+    CERT_URL:    r[4] || ''
   })).filter(r => r.NAME);
 }
 
@@ -403,7 +401,6 @@ async function loadData(opts) {
   if (typeof opts === 'boolean') opts = { skipCache: opts };
   const { skipCache = false, forceAggregation = false } = opts || {};
 
-  // Show cached data immediately for instant feedback
   if (!skipCache) {
     const cached = loadCache();
     if (cached) {
@@ -418,23 +415,20 @@ async function loadData(opts) {
 
   try {
     if (forceAggregation) {
-      try { await fetch(`${APPS_SCRIPT_URL}?fresh=1`); } catch (e) { console.warn('Force-aggregation ping failed:', e); }
+      try { await fetch(`${APPS_SCRIPT_URL}?fresh=1`); } catch (e) {}
     }
 
     const fresh = await fetchMasterSheet();
     if (fresh.length === 0) throw new Error('Master sheet returned no data');
 
-    // Guard against partial responses overwriting good cached data
     const cached = loadCache();
     if (!cached || fresh.length >= cached.length * 0.95) {
       allData = fresh;
       saveCache(allData);
     } else {
-      console.warn(`Fetch returned fewer records than cache (${fresh.length} vs ${cached.length}), keeping cache`);
       allData = cached;
     }
   } catch (e) {
-    console.error('Load failed:', e);
     if (allData.length === 0) {
       safeSetText('lastUpdated', 'Failed to load — check MASTER_SHEET_ID');
     }
@@ -448,8 +442,6 @@ async function loadData(opts) {
   // Fetch protection status separately (non-blocking)
   updateProtectionBadge();
 }
-
-// =================== Submit BLS Request (public) ===================
 
 function setupSubmitRequest() {
   const openBtn   = document.getElementById('submitRequestBtn');
@@ -604,8 +596,6 @@ function setupSubmitRequest() {
   });
 }
 
-// =================== Admin Monitor (password-gated) ===================
-
 const MONITOR_PASSWORD = '199365';
 
 function setupMonitor() {
@@ -656,8 +646,6 @@ function setupMonitor() {
   });
 }
 
-// =================== Pending requests review (admin) ===================
-
 // Damerau-Levenshtein-ish similarity for fuzzy name matching.
 function nameSimilarity(a, b) {
   const norm = s => String(s || '').toUpperCase().replace(/[^A-Z ]/g, '').replace(/\s+/g, ' ').trim();
@@ -702,7 +690,7 @@ async function fetchPendingRequests() {
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.requests) ? data.requests : [];
-  } catch (e) { console.error(e); return []; }
+  } catch (e) { return []; }
 }
 
 async function fetchApprovalLog() {
@@ -711,7 +699,7 @@ async function fetchApprovalLog() {
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.entries) ? data.entries : [];
-  } catch (e) { console.error(e); return []; }
+  } catch (e) { return []; }
 }
 
 function setupPendingReview() {
@@ -782,7 +770,7 @@ async function runBulkApprove(items) {
   showPendingLoading('Re-aggregating master sheet…', 'Fetching all source sheets. This usually takes 20–40 seconds.');
   try {
     await loadData({ skipCache: true, forceAggregation: true });
-  } catch (e) { console.error(e); }
+  } catch (e) {}
   if (errors.length > 0) {
     alert(`${items.length - errors.length} approved successfully. ${errors.length} failed:\n\n` + errors.map(e => `• ${e.error}`).join('\n'));
   }
@@ -876,24 +864,23 @@ async function loadPendingRequests() {
     `;
   }).join('');
 
-  // Wire up bulk-select controls
   const selectAll = content.querySelector('#pendingSelectAll');
   const selectedCount = content.querySelector('#pendingSelectedCount');
   const approveSelectedBtn = content.querySelector('#pendingApproveSelectedBtn');
-  const cbs = () => Array.from(content.querySelectorAll('.pending-select-cb'));
+  const allCbs = Array.from(content.querySelectorAll('.pending-select-cb'));
   const updateSelected = () => {
-    const checked = cbs().filter(c => c.checked);
+    const checked = allCbs.filter(c => c.checked);
     if (selectedCount) selectedCount.textContent = `${checked.length} selected`;
     if (approveSelectedBtn) approveSelectedBtn.disabled = checked.length === 0;
-    if (selectAll) selectAll.checked = checked.length === cbs().length && cbs().length > 0;
+    if (selectAll) selectAll.checked = checked.length === allCbs.length && allCbs.length > 0;
   };
-  cbs().forEach(c => c.addEventListener('change', updateSelected));
+  allCbs.forEach(c => c.addEventListener('change', updateSelected));
   selectAll?.addEventListener('change', () => {
-    cbs().forEach(c => { c.checked = selectAll.checked; });
+    allCbs.forEach(c => { c.checked = selectAll.checked; });
     updateSelected();
   });
   approveSelectedBtn?.addEventListener('click', async () => {
-    const checked = cbs().filter(c => c.checked);
+    const checked = allCbs.filter(c => c.checked);
     if (checked.length === 0) return;
     const exactCount = checked.filter(c => c.getAttribute('data-exact')).length;
     let msg = `Approve ${checked.length} request${checked.length > 1 ? 's' : ''}?`;
@@ -902,7 +889,7 @@ async function loadPendingRequests() {
     await runBulkApprove(checked.map(c => ({ id: c.getAttribute('data-id'), replace: c.getAttribute('data-exact') || '' })));
   });
 
-  // Wire up approve buttons
+
   content.querySelectorAll('.approve-req-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id');
@@ -933,7 +920,7 @@ async function loadPendingRequests() {
     });
   });
 
-  // Wire up reject buttons
+
   content.querySelectorAll('.reject-req-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id');
@@ -1092,8 +1079,18 @@ function collapseChanges(entries) {
     result.push({ ...last, action: 'MODIFIED', name: last.name, newDetail: finalDetail, oldDetail: initialDetail, timestamp: last.timestamp });
   });
 
-  // Newest first
   return result.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+function splitDetail(s) {
+  const parts = String(s || '').split(' / ');
+  return { designation: (parts[0] || '').trim(), expiry: (parts[1] || '').trim() };
+}
+
+function fieldRow(label, value) {
+  return value
+    ? `<div><span class="text-slate-500">${label}:</span> <span class="text-slate-200">${escapeHtml(value)}</span></div>`
+    : '';
 }
 
 async function loadMonitor(force) {
@@ -1104,7 +1101,6 @@ async function loadMonitor(force) {
   const undoBtn    = document.getElementById('monitorUndoBtn');
   if (!content) return;
 
-  // Disable action buttons while loading
   [refreshBtn, forceBtn, markBtn, undoBtn].forEach(b => { if (b) b.disabled = true; });
 
   if (force) {
@@ -1153,7 +1149,6 @@ async function loadMonitor(force) {
     if (!statusRes.ok) throw new Error('HTTP ' + statusRes.status);
     const status = await statusRes.json();
 
-    // Compute per-department counts from current dashboard data
     const deptCounts = {};
     allData.forEach(r => { deptCounts[r.DEPARTMENT] = (deptCounts[r.DEPARTMENT] || 0) + 1; });
 
@@ -1176,7 +1171,6 @@ async function loadMonitor(force) {
       changesByDept[d] = collapseChanges(changesByDept[d]);
     });
 
-    // Sort departments: those with new changes first (by count desc), then alphabetically
     const allDepts = new Set([...Object.keys(deptCounts), ...Object.keys(changesByDept)]);
     const sortedDepts = [...allDepts].sort((a, b) => {
       const ca = (changesByDept[a] || []).length;
@@ -1255,16 +1249,8 @@ async function loadMonitor(force) {
                         const action = c.action;
                         const colorMap = { ADDED: 'text-green-300', REMOVED: 'text-red-300', MODIFIED: 'text-yellow-300' };
                         const symMap   = { ADDED: '+', REMOVED: '✗', MODIFIED: '✏' };
-                        // Split "DESIGNATION / EXPIRY" into separate fields
-                        const splitDetail = (s) => {
-                          const parts = String(s || '').split(' / ');
-                          return { designation: (parts[0] || '').trim(), expiry: (parts[1] || '').trim() };
-                        };
                         const newD = splitDetail(c.newDetail);
                         const oldD = splitDetail(c.oldDetail);
-                        const fieldRow = (label, value) => value
-                          ? `<div><span class="text-slate-500">${label}:</span> <span class="text-slate-200">${escapeHtml(value)}</span></div>`
-                          : '';
                         let body = '';
                         if (action === 'ADDED') {
                           body = fieldRow('name', c.name) + fieldRow('designation', newD.designation) + fieldRow('expiry date', newD.expiry);
@@ -1313,7 +1299,6 @@ async function loadMonitor(force) {
       </div>
     `;
 
-    // Wire up safety override buttons
     content.querySelectorAll('.override-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const dept = btn.getAttribute('data-dept');
@@ -1326,12 +1311,11 @@ async function loadMonitor(force) {
         try {
           await fetch(url);
           await loadData({ skipCache: true });
-        } catch (e) { console.error(e); }
+        } catch (e) {}
         loadMonitor(false);
       });
     });
 
-    // Wire up click-to-expand on department rows
     content.querySelectorAll('.dept-row').forEach(row => {
       const head   = row.querySelector('.flex.items-center.justify-between');
       const detail = row.querySelector('.dept-detail');
@@ -1373,15 +1357,11 @@ async function updateProtectionBadge() {
   }
 }
 
-// =================== Rendering ===================
-
 function populateDepartmentDropdown() {
   const select = document.getElementById('departmentFilter');
   if (!select) return;
-  select.innerHTML = '<option value="ALL">All Departments</option>';
-  DEPARTMENTS.forEach(dep => {
-    select.innerHTML += `<option value="${dep}"${dep === currentDepartment ? ' selected' : ''}>${dep}</option>`;
-  });
+  select.innerHTML = '<option value="ALL">All Departments</option>' +
+    DEPARTMENTS.map(dep => `<option value="${dep}"${dep === currentDepartment ? ' selected' : ''}>${dep}</option>`).join('');
 }
 
 function processDashboard() {
@@ -1429,18 +1409,24 @@ function updateDeptChart() {
   }
   card.classList.remove('hidden');
 
-  const departments = [...new Set(allData.map(x => x.DEPARTMENT))].sort((a, b) => {
-    const pctOf = dept => {
-      const d = allData.filter(x => x.DEPARTMENT === dept);
-      return d.length ? d.filter(x => ['VALID','EXPIRING SOON'].includes(getStatus(x.EXPIRY))).length / d.length : 0;
-    };
-    return pctOf(b) - pctOf(a);
+  const VALID_STATUSES = ['VALID', 'EXPIRING SOON'];
+  const deptStats = new Map();
+  allData.forEach(x => {
+    let s = deptStats.get(x.DEPARTMENT);
+    if (!s) { s = { total: 0, valid: 0 }; deptStats.set(x.DEPARTMENT, s); }
+    s.total++;
+    if (VALID_STATUSES.includes(getStatus(x.EXPIRY))) s.valid++;
+  });
+
+  const departments = [...deptStats.keys()].sort((a, b) => {
+    const sa = deptStats.get(a), sb = deptStats.get(b);
+    const pa = sa.total ? sa.valid / sa.total : 0;
+    const pb = sb.total ? sb.valid / sb.total : 0;
+    return pb - pa;
   });
 
   bars.innerHTML = departments.map(dept => {
-    const deptData = allData.filter(x => x.DEPARTMENT === dept);
-    const total = deptData.length;
-    const valid = deptData.filter(x => ['VALID','EXPIRING SOON'].includes(getStatus(x.EXPIRY))).length;
+    const { total, valid } = deptStats.get(dept);
     const pct   = total ? ((valid / total) * 100).toFixed(1) : 0;
     const barColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#f87171';
     return `
@@ -1478,6 +1464,7 @@ function populateTable() {
       <td>${item.DESIGNATION}</td>
       <td>${item.EXPIRY}</td>
       <td>${status}</td>
+      <td>${item.CERT_URL ? `<a href="${escapeHtml(item.CERT_URL)}" target="_blank" class="text-cyan-400 hover:text-cyan-300 text-xs underline">View</a>` : ''}</td>
     `;
     fragment.appendChild(tr);
   }
@@ -1509,9 +1496,8 @@ function setDonutDeptText(name) {
   const startY = { 2: 122, 3: 124 }[lines.length] ?? 120;
   el.setAttribute('y', String(startY));
 
-  const ns = 'http://www.w3.org/2000/svg';
   lines.forEach((l, i) => {
-    const t = document.createElementNS(ns, 'tspan');
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
     t.setAttribute('x', '100');
     t.setAttribute('dy', i === 0 ? '0' : String(lineH));
     t.textContent = l;
@@ -1571,9 +1557,6 @@ document.addEventListener('DOMContentLoaded', () => {
     processDashboard();
   });
   document.getElementById('refreshButton')?.addEventListener('click', async () => {
-    // Just re-read the master sheet; the master is on a 30-min auto-refresh
-    // schedule. Use the Admin Monitor → "Force re-aggregation" if you really
-    // want to bypass the schedule.
     await loadData({ skipCache: true });
   });
 
@@ -1587,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(refreshPendingBadge, 5 * 60 * 1000);
 
   setInterval(async () => {
-    try { await loadData(); } catch (e) { console.error('Auto refresh failed:', e); }
+    try { await loadData(); } catch (e) {}
   }, 10 * 60 * 1000);
 });
 </script>
