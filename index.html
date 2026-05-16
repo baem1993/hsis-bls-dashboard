@@ -1471,11 +1471,16 @@ function populateTable() {
   tbody.replaceChildren(fragment);
 }
 
+const DEPT_SHORT_NAMES = {
+  "Unit Pengurusan Risiko Dan Survelan Klinikal": "UPRSK"
+};
+
 function setDonutDeptText(name) {
   const el = document.getElementById('donutCenterDept');
   if (!el) return;
   while (el.firstChild) el.removeChild(el.firstChild);
 
+  if (DEPT_SHORT_NAMES[name]) name = DEPT_SHORT_NAMES[name];
   const words = name.split(' ');
   if (words.length === 1 || name.length <= 15) {
     el.setAttribute('y', '127');
